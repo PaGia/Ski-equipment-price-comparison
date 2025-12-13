@@ -1,0 +1,1787 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>雪板價格比較器</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Noto Sans TC', sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      min-height: 100vh;
+      color: #fff;
+    }
+
+    .header {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      padding: 20px;
+      text-align: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .header h1 {
+      font-size: 2rem;
+      margin-bottom: 10px;
+      background: linear-gradient(90deg, #00d2ff, #3a7bd5);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .header-info {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+
+    .stat-badge {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 0.9rem;
+    }
+
+    .store-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: 500;
+    }
+
+    .store-badge.murasaki {
+      background: rgba(255, 107, 107, 0.2);
+      color: #ff6b6b;
+      border: 1px solid rgba(255, 107, 107, 0.3);
+    }
+
+    .store-badge.northshore {
+      background: rgba(0, 210, 255, 0.2);
+      color: #00d2ff;
+      border: 1px solid rgba(0, 210, 255, 0.3);
+    }
+
+    .controls {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      padding: 20px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1rem;
+      font-weight: 500;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(90deg, #00d2ff, #3a7bd5);
+      color: #fff;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 20px rgba(0, 210, 255, 0.4);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .view-toggle {
+      display: flex;
+      gap: 5px;
+    }
+
+    .view-btn {
+      padding: 10px 15px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-size: 1.2rem;
+    }
+
+    .view-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .view-btn.active {
+      background: rgba(0, 210, 255, 0.3);
+      border-color: #00d2ff;
+    }
+
+    .filters {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      padding: 0 20px 20px;
+      flex-wrap: wrap;
+    }
+
+    .filter-group {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .filter-group label {
+      font-size: 0.8rem;
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    .filter-group input,
+    .filter-group select {
+      padding: 10px 15px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+      font-size: 0.9rem;
+      min-width: 150px;
+    }
+
+    .filter-group input::placeholder {
+      color: rgba(255, 255, 255, 0.5);
+    }
+
+    .filter-group select option {
+      background: #1a1a2e;
+      color: #fff;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 50px;
+      font-size: 1.2rem;
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    .loading-spinner {
+      width: 50px;
+      height: 50px;
+      border: 4px solid rgba(255, 255, 255, 0.1);
+      border-top-color: #00d2ff;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Grid View */
+    .product-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 20px;
+    }
+
+    .product-card {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 16px;
+      overflow: hidden;
+      transition: all 0.3s ease;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .product-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+      border-color: rgba(0, 210, 255, 0.3);
+    }
+
+    .product-image {
+      width: 100%;
+      height: 200px;
+      object-fit: contain;
+      background: #fff;
+      padding: 10px;
+    }
+
+    .product-image-placeholder {
+      width: 100%;
+      height: 200px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255, 255, 255, 0.1);
+      color: rgba(255, 255, 255, 0.5);
+      font-size: 3rem;
+    }
+
+    .product-info {
+      padding: 15px;
+    }
+
+    .product-brand {
+      font-size: 0.8rem;
+      color: #00d2ff;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 5px;
+    }
+
+    .product-name {
+      font-size: 1rem;
+      font-weight: 500;
+      margin-bottom: 10px;
+      line-height: 1.4;
+    }
+
+    .product-price-summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+
+    .lowest-price {
+      color: #00ff88;
+      font-size: 1.3rem;
+      font-weight: 700;
+    }
+
+    .store-count {
+      font-size: 0.8rem;
+      color: rgba(255, 255, 255, 0.6);
+    }
+
+    .expand-btn {
+      width: 100%;
+      padding: 10px;
+      background: rgba(0, 210, 255, 0.1);
+      border: none;
+      color: #00d2ff;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .expand-btn:hover {
+      background: rgba(0, 210, 255, 0.2);
+    }
+
+    .expand-btn .arrow {
+      transition: transform 0.3s ease;
+    }
+
+    .expand-btn.expanded .arrow {
+      transform: rotate(180deg);
+    }
+
+    .store-list {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease;
+      background: rgba(0, 0, 0, 0.2);
+    }
+
+    .store-list.expanded {
+      max-height: 500px;
+    }
+
+    .store-item {
+      display: flex;
+      align-items: center;
+      padding: 12px 15px;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      gap: 10px;
+    }
+
+    .store-item:first-child {
+      border-top: none;
+    }
+
+    .store-item.best-price {
+      background: rgba(0, 255, 136, 0.1);
+    }
+
+    .store-item .store-info {
+      flex: 1;
+    }
+
+    .store-item .store-name {
+      font-weight: 500;
+      font-size: 0.9rem;
+    }
+
+    .store-item .store-currency {
+      font-size: 0.75rem;
+      color: rgba(255, 255, 255, 0.5);
+    }
+
+    .store-item .store-price {
+      text-align: right;
+    }
+
+    .store-item .price-local {
+      font-weight: 700;
+      font-size: 1rem;
+    }
+
+    .store-item .price-jpy {
+      font-size: 0.75rem;
+      color: rgba(255, 255, 255, 0.5);
+    }
+
+    .store-item .store-link {
+      padding: 6px 12px;
+      background: rgba(0, 210, 255, 0.2);
+      color: #00d2ff;
+      text-decoration: none;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      transition: all 0.3s ease;
+    }
+
+    .store-item .store-link:hover {
+      background: rgba(0, 210, 255, 0.4);
+    }
+
+    /* List View */
+    .product-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .product-list .product-card {
+      border-radius: 12px;
+    }
+
+    .product-list .product-main {
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+
+    .product-list .product-main:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .product-list .product-image-container {
+      flex-shrink: 0;
+      width: 80px;
+      height: 80px;
+      background: #fff;
+      border-radius: 8px;
+      margin: 10px;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .product-list .product-image {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      padding: 5px;
+    }
+
+    .product-list .product-image-placeholder {
+      width: 100%;
+      height: 100%;
+      font-size: 2rem;
+    }
+
+    .product-list .product-info {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      padding: 10px 15px;
+    }
+
+    .product-list .product-details {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .product-list .product-brand {
+      margin-bottom: 2px;
+    }
+
+    .product-list .product-name {
+      margin-bottom: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .product-list .product-price-info {
+      flex-shrink: 0;
+      text-align: right;
+    }
+
+    .product-list .lowest-price {
+      font-size: 1.1rem;
+    }
+
+    .product-list .lowest-store {
+      font-size: 0.75rem;
+      color: rgba(255, 255, 255, 0.5);
+    }
+
+    .product-list .expand-indicator {
+      padding: 10px 15px;
+      color: #00d2ff;
+      font-size: 1.2rem;
+      transition: transform 0.3s ease;
+    }
+
+    .product-list .expand-indicator.expanded {
+      transform: rotate(180deg);
+    }
+
+    .no-data {
+      text-align: center;
+      padding: 50px;
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    .no-data h2 {
+      margin-bottom: 10px;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      padding: 15px 25px;
+      border-radius: 10px;
+      color: #fff;
+      font-weight: 500;
+      z-index: 1000;
+      animation: slideIn 0.3s ease;
+    }
+
+    .toast.success {
+      background: linear-gradient(90deg, #00b894, #00cec9);
+    }
+
+    .toast.error {
+      background: linear-gradient(90deg, #ff6b6b, #ee5a24);
+    }
+
+    .toast.info {
+      background: linear-gradient(90deg, #00d2ff, #3a7bd5);
+    }
+
+    @keyframes slideIn {
+      from {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    .summary-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 15px;
+      margin-bottom: 30px;
+    }
+
+    .summary-card {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .summary-card h3 {
+      font-size: 0.85rem;
+      color: rgba(255, 255, 255, 0.7);
+      margin-bottom: 10px;
+    }
+
+    .summary-card .value {
+      font-size: 1.5rem;
+      font-weight: 700;
+      background: linear-gradient(90deg, #00d2ff, #3a7bd5);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .multi-store-badge {
+      background: linear-gradient(90deg, #ff6b6b, #ee5a24);
+      color: #fff;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      margin-left: 8px;
+    }
+
+    /* 新增店家按鈕 */
+    .add-store-btn {
+      padding: 8px 12px;
+      background: linear-gradient(90deg, #00b894, #00cec9);
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 1.2rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      margin-left: 10px;
+    }
+
+    .add-store-btn:hover {
+      transform: scale(1.1);
+      box-shadow: 0 5px 20px rgba(0, 184, 148, 0.4);
+    }
+
+    .store-filter-wrapper {
+      display: flex;
+      align-items: flex-end;
+      gap: 5px;
+    }
+
+    /* Modal 對話框 */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.3s ease;
+    }
+
+    .modal-overlay.active {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .modal {
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      border-radius: 16px;
+      padding: 30px;
+      max-width: 500px;
+      width: 90%;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      transform: translateY(-20px);
+      transition: transform 0.3s ease;
+    }
+
+    .modal-overlay.active .modal {
+      transform: translateY(0);
+    }
+
+    .modal h2 {
+      margin-bottom: 20px;
+      background: linear-gradient(90deg, #00b894, #00cec9);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .modal-form {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .modal-form label {
+      font-size: 0.9rem;
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    .modal-form input {
+      width: 100%;
+      padding: 12px 15px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+      font-size: 1rem;
+    }
+
+    .modal-form input::placeholder {
+      color: rgba(255, 255, 255, 0.4);
+    }
+
+    .modal-form input:focus {
+      outline: none;
+      border-color: #00b894;
+    }
+
+    .modal-buttons {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .modal-buttons .btn {
+      flex: 1;
+    }
+
+    .btn-success {
+      background: linear-gradient(90deg, #00b894, #00cec9);
+      color: #fff;
+    }
+
+    .btn-success:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 20px rgba(0, 184, 148, 0.4);
+    }
+
+    .btn-success:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-cancel {
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .btn-cancel:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .modal-hint {
+      font-size: 0.8rem;
+      color: rgba(255, 255, 255, 0.5);
+      margin-top: 5px;
+    }
+
+    .modal-result {
+      margin-top: 15px;
+      padding: 15px;
+      border-radius: 8px;
+      display: none;
+    }
+
+    .modal-result.success {
+      display: block;
+      background: rgba(0, 184, 148, 0.2);
+      border: 1px solid rgba(0, 184, 148, 0.3);
+    }
+
+    .modal-result.error {
+      display: block;
+      background: rgba(255, 107, 107, 0.2);
+      border: 1px solid rgba(255, 107, 107, 0.3);
+    }
+
+    .modal-result h4 {
+      margin-bottom: 8px;
+    }
+
+    .modal-result p {
+      font-size: 0.9rem;
+      margin: 3px 0;
+    }
+
+    /* 自訂店家標籤 */
+    .store-badge.custom {
+      background: rgba(0, 184, 148, 0.2);
+      color: #00b894;
+      border: 1px solid rgba(0, 184, 148, 0.3);
+    }
+
+    .delete-store-btn {
+      padding: 4px 8px;
+      background: rgba(255, 107, 107, 0.2);
+      border: 1px solid rgba(255, 107, 107, 0.3);
+      border-radius: 4px;
+      color: #ff6b6b;
+      font-size: 0.7rem;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .delete-store-btn:hover {
+      background: rgba(255, 107, 107, 0.4);
+    }
+
+    /* 店家管理 Modal 分頁 */
+    .modal-tabs {
+      display: flex;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+      margin-bottom: 20px;
+    }
+
+    .modal-tab {
+      flex: 1;
+      padding: 12px;
+      background: none;
+      border: none;
+      color: rgba(255, 255, 255, 0.6);
+      cursor: pointer;
+      font-size: 0.95rem;
+      transition: all 0.3s ease;
+      position: relative;
+    }
+
+    .modal-tab:hover {
+      color: rgba(255, 255, 255, 0.9);
+    }
+
+    .modal-tab.active {
+      color: #00b894;
+    }
+
+    .modal-tab.active::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, #00b894, #00cec9);
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    /* 店家列表樣式 */
+    .store-list-manage {
+      max-height: 350px;
+      overflow-y: auto;
+    }
+
+    .store-manage-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 15px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      margin-bottom: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .store-manage-item:hover {
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .store-manage-info {
+      flex: 1;
+    }
+
+    .store-manage-name {
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+
+    .store-manage-meta {
+      font-size: 0.8rem;
+      color: rgba(255, 255, 255, 0.5);
+    }
+
+    .store-manage-type {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 0.7rem;
+      margin-left: 8px;
+    }
+
+    .store-manage-type.builtin {
+      background: rgba(0, 210, 255, 0.2);
+      color: #00d2ff;
+    }
+
+    .store-manage-type.custom {
+      background: rgba(0, 184, 148, 0.2);
+      color: #00b894;
+    }
+
+    .store-manage-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-delete {
+      padding: 8px 16px;
+      background: rgba(255, 107, 107, 0.2);
+      border: 1px solid rgba(255, 107, 107, 0.3);
+      border-radius: 6px;
+      color: #ff6b6b;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: all 0.3s ease;
+    }
+
+    .btn-delete:hover {
+      background: rgba(255, 107, 107, 0.4);
+    }
+
+    .btn-delete:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .empty-stores {
+      text-align: center;
+      padding: 30px;
+      color: rgba(255, 255, 255, 0.5);
+    }
+
+    /* 進度條樣式 */
+    .progress-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: rgba(26, 26, 46, 0.95);
+      backdrop-filter: blur(10px);
+      padding: 20px;
+      z-index: 200;
+      transform: translateY(-100%);
+      transition: transform 0.3s ease;
+      border-bottom: 1px solid rgba(0, 210, 255, 0.3);
+    }
+
+    .progress-container.active {
+      transform: translateY(0);
+    }
+
+    .progress-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+
+    .progress-title {
+      font-size: 1.1rem;
+      font-weight: 500;
+      color: #00d2ff;
+    }
+
+    .progress-stats {
+      display: flex;
+      gap: 20px;
+      font-size: 0.85rem;
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    .progress-bar-wrapper {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      height: 20px;
+      overflow: hidden;
+      margin-bottom: 10px;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #00d2ff, #3a7bd5);
+      border-radius: 10px;
+      transition: width 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #fff;
+      min-width: 40px;
+    }
+
+    .progress-details {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      color: rgba(255, 255, 255, 0.6);
+    }
+
+    .progress-message {
+      flex: 1;
+    }
+
+    .progress-time {
+      color: #00d2ff;
+    }
+
+    @media (max-width: 768px) {
+      .header h1 {
+        font-size: 1.5rem;
+      }
+
+      .product-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .filters {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .filter-group input,
+      .filter-group select {
+        width: 100%;
+      }
+
+      .product-list .product-info {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- 進度條 -->
+  <div class="progress-container" id="progressContainer">
+    <div class="progress-header">
+      <span class="progress-title">正在抓取資料...</span>
+      <div class="progress-stats">
+        <span id="progressStore">店家: -</span>
+        <span id="progressProducts">商品: 0</span>
+      </div>
+    </div>
+    <div class="progress-bar-wrapper">
+      <div class="progress-bar" id="progressBar" style="width: 0%">0%</div>
+    </div>
+    <div class="progress-details">
+      <span class="progress-message" id="progressMessage">準備中...</span>
+      <span class="progress-time" id="progressTime">已花費: 0秒</span>
+    </div>
+  </div>
+
+  <header class="header">
+    <h1>🏂 雪板價格比較器</h1>
+    <div class="header-info">
+      <span class="stat-badge" id="lastUpdated">最後更新: 載入中...</span>
+      <span class="stat-badge" id="totalProducts">商品數: -</span>
+      <span class="stat-badge" id="storeInfo">店家: -</span>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button class="btn btn-primary" id="refreshBtn" onclick="triggerScrape()">
+      <span>🔄</span> 更新全部資料
+    </button>
+    <button class="btn btn-secondary" onclick="loadProducts()">
+      <span>📊</span> 重新載入
+    </button>
+    <div class="view-toggle">
+      <button class="view-btn active" id="gridViewBtn" onclick="setViewMode('grid')" title="卡片檢視">
+        ▦
+      </button>
+      <button class="view-btn" id="listViewBtn" onclick="setViewMode('list')" title="列表檢視">
+        ☰
+      </button>
+    </div>
+  </div>
+
+  <div class="filters">
+    <div class="filter-group">
+      <label>搜尋商品</label>
+      <input type="text" id="searchInput" placeholder="品牌或商品名稱..." oninput="filterProducts()">
+    </div>
+    <div class="filter-group">
+      <label>價格範圍 (JPY)</label>
+      <select id="priceFilter" onchange="filterProducts()">
+        <option value="">全部價格</option>
+        <option value="0-30000">¥30,000 以下</option>
+        <option value="30000-50000">¥30,000 - ¥50,000</option>
+        <option value="50000-80000">¥50,000 - ¥80,000</option>
+        <option value="80000-100000">¥80,000 - ¥100,000</option>
+        <option value="100000-999999">¥100,000 以上</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>店家篩選</label>
+      <div class="store-filter-wrapper">
+        <select id="storeFilter" onchange="filterProducts()">
+          <option value="">全部店家</option>
+          <option value="multi">多店比價</option>
+        </select>
+        <button class="add-store-btn" onclick="openStoreModal('list')" title="管理店家">...</button>
+      </div>
+    </div>
+    <div class="filter-group">
+      <label>排序方式</label>
+      <select id="sortFilter" onchange="filterProducts()">
+        <option value="price-asc">價格低到高</option>
+        <option value="price-desc">價格高到低</option>
+        <option value="stores-desc">比價店家多</option>
+        <option value="name-asc">名稱 A-Z</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="summary-cards" id="summaryCards" style="display: none;">
+      <div class="summary-card">
+        <h3>總商品數</h3>
+        <div class="value" id="displayCount">-</div>
+      </div>
+      <div class="summary-card">
+        <h3>可比價商品</h3>
+        <div class="value" id="multiStoreCount">-</div>
+      </div>
+      <div class="summary-card">
+        <h3>平均最低價</h3>
+        <div class="value" id="avgPrice">-</div>
+      </div>
+      <div class="summary-card">
+        <h3>店家數量</h3>
+        <div class="value" id="storeCount">-</div>
+      </div>
+    </div>
+
+    <div id="content">
+      <div class="loading">
+        <div class="loading-spinner"></div>
+        <p>載入商品資料中...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 店家管理 Modal -->
+  <div class="modal-overlay" id="storeModal">
+    <div class="modal">
+      <h2>店家管理</h2>
+
+      <!-- 分頁標籤 -->
+      <div class="modal-tabs">
+        <button class="modal-tab active" onclick="switchStoreTab('list')">現有店家</button>
+        <button class="modal-tab" onclick="switchStoreTab('add')">新增店家</button>
+      </div>
+
+      <!-- 店家列表分頁 -->
+      <div class="tab-content active" id="storeListTab">
+        <div class="store-list-manage" id="storeListManage">
+          <div class="empty-stores">載入中...</div>
+        </div>
+        <div class="modal-buttons" style="margin-top: 15px;">
+          <button type="button" class="btn btn-cancel" onclick="closeStoreModal()">關閉</button>
+        </div>
+      </div>
+
+      <!-- 新增店家分頁 -->
+      <div class="tab-content" id="addStoreTab">
+        <form class="modal-form" onsubmit="submitAddStore(event)">
+          <div>
+            <label>店家網址 *</label>
+            <input type="url" id="storeUrl" placeholder="https://example.com/products" required>
+            <p class="modal-hint">請貼上該店家的商品列表頁面網址</p>
+          </div>
+          <div>
+            <label>店家名稱 (選填)</label>
+            <input type="text" id="storeName" placeholder="會自動從網站偵測">
+            <p class="modal-hint">若不填寫，系統會自動從網址偵測店家名稱</p>
+          </div>
+          <div class="modal-buttons">
+            <button type="button" class="btn btn-cancel" onclick="closeStoreModal()">取消</button>
+            <button type="submit" class="btn btn-success" id="addStoreSubmitBtn">新增店家</button>
+          </div>
+        </form>
+        <div class="modal-result" id="addStoreResult"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let allProducts = [];
+    let storesData = [];
+    let exchangeRates = {};
+    let currentViewMode = 'grid';
+    let currentFilteredProducts = [];
+    let expandedProducts = new Set();
+
+    // 格式化價格
+    function formatPrice(price, currency = 'JPY') {
+      if (!price) return '-';
+      if (currency === 'JPY') {
+        return '¥' + Math.round(price).toLocaleString();
+      } else if (currency === 'CAD') {
+        return 'C$' + price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      } else if (currency === 'USD') {
+        return '$' + price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      }
+      return price.toLocaleString();
+    }
+
+    // 格式化日期
+    function formatDate(dateStr) {
+      if (!dateStr) return '尚未更新';
+      const date = new Date(dateStr);
+      return date.toLocaleString('zh-TW', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+
+    // 顯示 Toast 訊息
+    function showToast(message, type = 'info') {
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      toast.textContent = message;
+      document.body.appendChild(toast);
+
+      setTimeout(() => {
+        toast.remove();
+      }, 3000);
+    }
+
+    // 設定檢視模式
+    function setViewMode(mode) {
+      currentViewMode = mode;
+      document.getElementById('gridViewBtn').classList.toggle('active', mode === 'grid');
+      document.getElementById('listViewBtn').classList.toggle('active', mode === 'list');
+      renderProducts(currentFilteredProducts);
+    }
+
+    // 切換展開狀態
+    function toggleExpand(productKey) {
+      if (expandedProducts.has(productKey)) {
+        expandedProducts.delete(productKey);
+      } else {
+        expandedProducts.add(productKey);
+      }
+      renderProducts(currentFilteredProducts);
+    }
+
+    // 載入商品資料
+    async function loadProducts() {
+      const content = document.getElementById('content');
+      content.innerHTML = `
+        <div class="loading">
+          <div class="loading-spinner"></div>
+          <p>載入商品資料中...</p>
+        </div>
+      `;
+
+      try {
+        const response = await fetch('/api/products');
+        const data = await response.json();
+
+        document.getElementById('lastUpdated').textContent =
+          `最後更新: ${formatDate(data.lastUpdated)}`;
+        document.getElementById('totalProducts').textContent =
+          `商品數: ${data.totalProducts || 0}`;
+
+        storesData = data.stores || [];
+        exchangeRates = data.exchangeRates || {};
+        allProducts = data.products || [];
+
+        // 更新店家篩選選項
+        const storeFilter = document.getElementById('storeFilter');
+        storeFilter.innerHTML = '<option value="">全部店家</option><option value="multi">多店比價</option>';
+        storesData.forEach(store => {
+          storeFilter.innerHTML += `<option value="${store.id}">${store.name}</option>`;
+        });
+
+        document.getElementById('storeInfo').textContent =
+          `店家: ${storesData.map(s => s.name).join(', ')}`;
+
+        if (allProducts.length === 0) {
+          content.innerHTML = `
+            <div class="no-data">
+              <h2>尚無商品資料</h2>
+              <p>請點擊「更新全部資料」按鈕開始抓取</p>
+            </div>
+          `;
+          document.getElementById('summaryCards').style.display = 'none';
+        } else {
+          document.getElementById('summaryCards').style.display = 'grid';
+          filterProducts();
+        }
+      } catch (error) {
+        console.error('載入失敗:', error);
+        content.innerHTML = `
+          <div class="no-data">
+            <h2>載入失敗</h2>
+            <p>${error.message}</p>
+          </div>
+        `;
+        showToast('載入資料失敗', 'error');
+      }
+    }
+
+    // 篩選和排序商品
+    function filterProducts() {
+      const search = document.getElementById('searchInput').value.toLowerCase();
+      const priceRange = document.getElementById('priceFilter').value;
+      const storeFilter = document.getElementById('storeFilter').value;
+      const sort = document.getElementById('sortFilter').value;
+
+      let filtered = allProducts.filter(product => {
+        // 搜尋篩選
+        const matchSearch = !search ||
+          (product.brand && product.brand.toLowerCase().includes(search)) ||
+          (product.name && product.name.toLowerCase().includes(search));
+
+        // 價格篩選
+        let matchPrice = true;
+        if (priceRange) {
+          const [min, max] = priceRange.split('-').map(Number);
+          const price = product.lowestPrice || 0;
+          matchPrice = price >= min && price <= max;
+        }
+
+        // 店家篩選
+        let matchStore = true;
+        if (storeFilter === 'multi') {
+          matchStore = product.storeCount > 1;
+        } else if (storeFilter) {
+          matchStore = product.stores.some(s => s.store === storeFilter);
+        }
+
+        return matchSearch && matchPrice && matchStore;
+      });
+
+      // 排序
+      filtered.sort((a, b) => {
+        switch (sort) {
+          case 'price-asc':
+            return (a.lowestPrice || Infinity) - (b.lowestPrice || Infinity);
+          case 'price-desc':
+            return (b.lowestPrice || 0) - (a.lowestPrice || 0);
+          case 'stores-desc':
+            return (b.storeCount || 0) - (a.storeCount || 0);
+          case 'name-asc':
+            return (a.name || '').localeCompare(b.name || '');
+          default:
+            return 0;
+        }
+      });
+
+      currentFilteredProducts = filtered;
+
+      // 更新統計資料
+      updateSummary(filtered);
+
+      // 渲染商品
+      renderProducts(filtered);
+    }
+
+    // 更新統計摘要
+    function updateSummary(products) {
+      const prices = products.filter(p => p.lowestPrice).map(p => p.lowestPrice);
+      const multiStoreProducts = products.filter(p => p.storeCount > 1);
+
+      document.getElementById('displayCount').textContent = products.length;
+      document.getElementById('multiStoreCount').textContent = multiStoreProducts.length;
+      document.getElementById('avgPrice').textContent =
+        prices.length ? formatPrice(Math.round(prices.reduce((a, b) => a + b, 0) / prices.length)) : '-';
+      document.getElementById('storeCount').textContent = storesData.length;
+    }
+
+    // 渲染商品列表
+    function renderProducts(products) {
+      const content = document.getElementById('content');
+
+      if (products.length === 0) {
+        content.innerHTML = `
+          <div class="no-data">
+            <h2>沒有符合條件的商品</h2>
+            <p>請嘗試調整篩選條件</p>
+          </div>
+        `;
+        return;
+      }
+
+      if (currentViewMode === 'grid') {
+        renderGridView(products);
+      } else {
+        renderListView(products);
+      }
+    }
+
+    // 渲染店家列表
+    function renderStoreList(stores) {
+      return stores.map((store, index) => `
+        <div class="store-item ${index === 0 ? 'best-price' : ''}">
+          <span class="store-badge ${store.store}">${store.storeName}</span>
+          <div class="store-info">
+            <div class="store-currency">${store.currency}</div>
+          </div>
+          <div class="store-price">
+            <div class="price-local">${formatPrice(store.salePrice || store.originalPrice, store.currency)}</div>
+            ${store.currency !== 'JPY' ? `<div class="price-jpy">≈ ${formatPrice(store.priceJPY)}</div>` : ''}
+          </div>
+          <a href="${store.productUrl}" target="_blank" rel="noopener" class="store-link">前往</a>
+        </div>
+      `).join('');
+    }
+
+    // 卡片檢視
+    function renderGridView(products) {
+      const content = document.getElementById('content');
+      const html = `
+        <div class="product-grid">
+          ${products.map(product => {
+            const isExpanded = expandedProducts.has(product.key);
+            return `
+              <div class="product-card">
+                ${product.imageUrl
+                  ? `<img src="${product.imageUrl}" alt="${product.name}" class="product-image" loading="lazy" onerror="this.outerHTML='<div class=\\'product-image-placeholder\\'>🏂</div>'">`
+                  : '<div class="product-image-placeholder">🏂</div>'
+                }
+                <div class="product-info">
+                  <div class="product-brand">${product.brand || '未知品牌'}</div>
+                  <div class="product-name">
+                    ${product.name || '未知商品'}
+                    ${product.storeCount > 1 ? `<span class="multi-store-badge">${product.storeCount}店比價</span>` : ''}
+                  </div>
+                  <div class="product-price-summary">
+                    <span class="lowest-price">${formatPrice(product.lowestPrice)}</span>
+                    <span class="store-count">${product.lowestStore}</span>
+                  </div>
+                </div>
+                <button class="expand-btn ${isExpanded ? 'expanded' : ''}" onclick="toggleExpand('${product.key}')">
+                  <span>查看 ${product.storeCount} 家店家價格</span>
+                  <span class="arrow">▼</span>
+                </button>
+                <div class="store-list ${isExpanded ? 'expanded' : ''}">
+                  ${renderStoreList(product.stores)}
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+      content.innerHTML = html;
+    }
+
+    // 列表檢視
+    function renderListView(products) {
+      const content = document.getElementById('content');
+      const html = `
+        <div class="product-list">
+          ${products.map(product => {
+            const isExpanded = expandedProducts.has(product.key);
+            return `
+              <div class="product-card">
+                <div class="product-main" onclick="toggleExpand('${product.key}')">
+                  <div class="product-image-container">
+                    ${product.imageUrl
+                      ? `<img src="${product.imageUrl}" alt="${product.name}" class="product-image" loading="lazy" onerror="this.outerHTML='<div class=\\'product-image-placeholder\\'>🏂</div>'">`
+                      : '<div class="product-image-placeholder">🏂</div>'
+                    }
+                  </div>
+                  <div class="product-info">
+                    <div class="product-details">
+                      <div class="product-brand">${product.brand || '未知品牌'}</div>
+                      <div class="product-name">
+                        ${product.name || '未知商品'}
+                        ${product.storeCount > 1 ? `<span class="multi-store-badge">${product.storeCount}店</span>` : ''}
+                      </div>
+                    </div>
+                    <div class="product-price-info">
+                      <div class="lowest-price">${formatPrice(product.lowestPrice)}</div>
+                      <div class="lowest-store">${product.lowestStore}</div>
+                    </div>
+                  </div>
+                  <div class="expand-indicator ${isExpanded ? 'expanded' : ''}">▼</div>
+                </div>
+                <div class="store-list ${isExpanded ? 'expanded' : ''}">
+                  ${renderStoreList(product.stores)}
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+      content.innerHTML = html;
+    }
+
+    // 觸發抓取
+    async function triggerScrape() {
+      const btn = document.getElementById('refreshBtn');
+      btn.disabled = true;
+      btn.innerHTML = '<span>⏳</span> 抓取中...';
+
+      showToast('開始抓取資料，這可能需要幾分鐘...', 'info');
+
+      try {
+        const response = await fetch('/api/scrape', { method: 'POST' });
+        const data = await response.json();
+
+        if (response.ok) {
+          showToast('抓取已開始！請稍候後重新載入', 'success');
+          checkScrapeStatus();
+        } else {
+          showToast(data.error || '抓取失敗', 'error');
+          btn.disabled = false;
+          btn.innerHTML = '<span>🔄</span> 更新全部資料';
+        }
+      } catch (error) {
+        showToast('請求失敗: ' + error.message, 'error');
+        btn.disabled = false;
+        btn.innerHTML = '<span>🔄</span> 更新全部資料';
+      }
+    }
+
+    // 顯示進度條
+    function showProgress() {
+      document.getElementById('progressContainer').classList.add('active');
+    }
+
+    // 隱藏進度條
+    function hideProgress() {
+      document.getElementById('progressContainer').classList.remove('active');
+    }
+
+    // 更新進度條顯示
+    function updateProgressUI(progress) {
+      const progressBar = document.getElementById('progressBar');
+      const progressStore = document.getElementById('progressStore');
+      const progressProducts = document.getElementById('progressProducts');
+      const progressMessage = document.getElementById('progressMessage');
+      const progressTime = document.getElementById('progressTime');
+
+      // 計算總進度
+      let percent = 0;
+      if (progress.totalStores > 0 && progress.totalPages > 0) {
+        const storeProgress = (progress.storeIndex - 1) / progress.totalStores;
+        const pageProgress = progress.currentPage / progress.totalPages / progress.totalStores;
+        percent = Math.round((storeProgress + pageProgress) * 100);
+      } else if (progress.totalStores > 0) {
+        percent = Math.round((progress.storeIndex / progress.totalStores) * 100);
+      }
+      percent = Math.min(percent, 99); // 最多 99%，完成時才 100%
+
+      progressBar.style.width = percent + '%';
+      progressBar.textContent = percent + '%';
+
+      progressStore.textContent = `店家: ${progress.storeIndex}/${progress.totalStores} ${progress.currentStore || ''}`;
+      progressProducts.textContent = `商品: ${progress.productsFound}`;
+      progressMessage.textContent = progress.message || '處理中...';
+      progressTime.textContent = `已花費: ${progress.elapsedTime}秒`;
+    }
+
+    // 檢查抓取狀態
+    async function checkScrapeStatus() {
+      const btn = document.getElementById('refreshBtn');
+      showProgress();
+
+      const check = async () => {
+        try {
+          const response = await fetch('/api/status');
+          const data = await response.json();
+
+          if (data.isScaping) {
+            // 更新進度條
+            if (data.progress) {
+              updateProgressUI(data.progress);
+            }
+            setTimeout(check, 1000); // 每秒更新一次
+          } else {
+            // 完成
+            const progressBar = document.getElementById('progressBar');
+            progressBar.style.width = '100%';
+            progressBar.textContent = '100%';
+            document.getElementById('progressMessage').textContent = '抓取完成！';
+
+            setTimeout(() => {
+              hideProgress();
+              btn.disabled = false;
+              btn.innerHTML = '<span>🔄</span> 更新全部資料';
+              showToast('抓取完成！正在重新載入...', 'success');
+              loadProducts();
+            }, 1500);
+          }
+        } catch (error) {
+          hideProgress();
+          btn.disabled = false;
+          btn.innerHTML = '<span>🔄</span> 更新全部資料';
+        }
+      };
+
+      setTimeout(check, 500);
+    }
+
+    // 開啟店家管理 Modal
+    function openStoreModal(tab = 'list') {
+      document.getElementById('storeModal').classList.add('active');
+      document.getElementById('storeUrl').value = '';
+      document.getElementById('storeName').value = '';
+      document.getElementById('addStoreResult').className = 'modal-result';
+      document.getElementById('addStoreResult').innerHTML = '';
+      switchStoreTab(tab);
+      if (tab === 'list') {
+        loadStoreList();
+      }
+    }
+
+    // 舊的函數保持相容性
+    function openAddStoreModal() {
+      openStoreModal('add');
+    }
+
+    // 關閉店家管理 Modal
+    function closeStoreModal() {
+      document.getElementById('storeModal').classList.remove('active');
+    }
+
+    // 舊的函數保持相容性
+    function closeAddStoreModal() {
+      closeStoreModal();
+    }
+
+    // 切換店家管理分頁
+    function switchStoreTab(tabName) {
+      // 更新分頁按鈕狀態
+      document.querySelectorAll('.modal-tab').forEach((tab, index) => {
+        if ((tabName === 'list' && index === 0) || (tabName === 'add' && index === 1)) {
+          tab.classList.add('active');
+        } else {
+          tab.classList.remove('active');
+        }
+      });
+
+      // 顯示對應的內容
+      document.getElementById('storeListTab').classList.toggle('active', tabName === 'list');
+      document.getElementById('addStoreTab').classList.toggle('active', tabName === 'add');
+
+      // 如果切換到列表分頁，載入店家列表
+      if (tabName === 'list') {
+        loadStoreList();
+      }
+    }
+
+    // 載入店家列表
+    async function loadStoreList() {
+      const container = document.getElementById('storeListManage');
+      container.innerHTML = '<div class="empty-stores">載入中...</div>';
+
+      try {
+        const response = await fetch('/api/stores');
+        const stores = await response.json();
+
+        if (stores.length === 0) {
+          container.innerHTML = '<div class="empty-stores">尚無店家</div>';
+          return;
+        }
+
+        container.innerHTML = stores.map(store => `
+          <div class="store-manage-item">
+            <div class="store-manage-info">
+              <div class="store-manage-name">
+                ${store.name}
+                <span class="store-manage-type ${store.type || 'builtin'}">${store.type === 'custom' ? '自訂' : '內建'}</span>
+              </div>
+              <div class="store-manage-meta">
+                ${store.currency} | ${store.country || '未知地區'}
+                ${store.baseUrl ? ` | <a href="${store.baseUrl}" target="_blank" style="color: #00d2ff;">開啟網站</a>` : ''}
+              </div>
+            </div>
+            <div class="store-manage-actions">
+              ${store.type === 'custom' ? `
+                <button class="btn-delete" onclick="deleteStoreFromModal('${store.id}', '${store.name}')">刪除</button>
+              ` : `
+                <span style="color: rgba(255,255,255,0.4); font-size: 0.8rem;">不可刪除</span>
+              `}
+            </div>
+          </div>
+        `).join('');
+      } catch (error) {
+        container.innerHTML = `<div class="empty-stores">載入失敗: ${error.message}</div>`;
+      }
+    }
+
+    // 從 Modal 中刪除店家
+    async function deleteStoreFromModal(storeId, storeName) {
+      if (!confirm(`確定要刪除店家「${storeName}」嗎？\n\n注意：這將同時刪除該店家的所有商品資料。`)) {
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/stores/${storeId}`, {
+          method: 'DELETE'
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          showToast(`已刪除店家: ${storeName}`, 'success');
+          loadStoreList(); // 重新載入列表
+          loadProducts();  // 重新載入商品
+        } else {
+          showToast(data.error || '刪除失敗', 'error');
+        }
+      } catch (error) {
+        showToast('請求失敗: ' + error.message, 'error');
+      }
+    }
+
+    // 提交新增店家
+    async function submitAddStore(event) {
+      event.preventDefault();
+
+      const url = document.getElementById('storeUrl').value.trim();
+      const name = document.getElementById('storeName').value.trim();
+      const submitBtn = document.getElementById('addStoreSubmitBtn');
+      const resultDiv = document.getElementById('addStoreResult');
+
+      if (!url) {
+        showToast('請輸入店家網址', 'error');
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = '偵測中...';
+      resultDiv.className = 'modal-result';
+      resultDiv.innerHTML = '';
+
+      try {
+        const response = await fetch('/api/stores', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ url, name: name || null })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          resultDiv.className = 'modal-result success';
+          resultDiv.innerHTML = `
+            <h4>✓ 新增成功!</h4>
+            <p><strong>店家:</strong> ${data.store.name}</p>
+            <p><strong>找到商品:</strong> ${data.productCount} 件</p>
+            ${data.sampleProducts && data.sampleProducts.length > 0 ? `
+              <p><strong>範例商品:</strong></p>
+              <ul style="margin-left: 20px; font-size: 0.85rem;">
+                ${data.sampleProducts.map(p => `<li>${p.brand || ''} ${p.name} - ${formatPrice(p.salePrice || p.originalPrice, data.store.currency)}</li>`).join('')}
+              </ul>
+            ` : ''}
+          `;
+          showToast(`已新增店家: ${data.store.name}`, 'success');
+
+          // 2秒後關閉並重新載入
+          setTimeout(() => {
+            closeAddStoreModal();
+            loadProducts();
+          }, 2000);
+        } else {
+          resultDiv.className = 'modal-result error';
+          resultDiv.innerHTML = `
+            <h4>✗ 新增失敗</h4>
+            <p>${data.error}</p>
+          `;
+          showToast(data.error, 'error');
+        }
+      } catch (error) {
+        resultDiv.className = 'modal-result error';
+        resultDiv.innerHTML = `
+          <h4>✗ 請求失敗</h4>
+          <p>${error.message}</p>
+        `;
+        showToast('請求失敗: ' + error.message, 'error');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = '新增店家';
+      }
+    }
+
+    // 刪除自訂店家
+    async function deleteStore(storeId, storeName) {
+      if (!confirm(`確定要刪除店家「${storeName}」嗎？`)) {
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/stores/${storeId}`, {
+          method: 'DELETE'
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          showToast(`已刪除店家: ${storeName}`, 'success');
+          loadProducts();
+        } else {
+          showToast(data.error || '刪除失敗', 'error');
+        }
+      } catch (error) {
+        showToast('請求失敗: ' + error.message, 'error');
+      }
+    }
+
+    // 點擊 Modal 外部關閉
+    document.addEventListener('click', (e) => {
+      if (e.target.id === 'storeModal') {
+        closeStoreModal();
+      }
+    });
+
+    // 頁面載入時執行
+    document.addEventListener('DOMContentLoaded', loadProducts);
+  </script>
+</body>
+</html>

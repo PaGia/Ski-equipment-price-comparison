@@ -1,0 +1,22 @@
+{
+  "sportsbomber-base-shop": {
+    "id": "sportsbomber-base-shop",
+    "name": "Sportsbomber",
+    "baseUrl": "https://sportsbomber.base.shop/categories/2746389",
+    "currency": "JPY",
+    "country": "JP",
+    "type": "custom",
+    "usePuppeteer": true,
+    "addedAt": "2025-12-13T13:18:08.606Z"
+  },
+  "comorsports-com": {
+    "id": "comorsports-com",
+    "name": "Comorsports",
+    "baseUrl": "https://comorsports.com/collections/sale-snowboard?product_type=Snowboards",
+    "currency": "USD",
+    "country": "US",
+    "type": "custom",
+    "usePuppeteer": false,
+    "addedAt": "2025-12-13T14:09:53.558Z"
+  }
+}
