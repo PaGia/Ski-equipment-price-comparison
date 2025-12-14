@@ -18,5 +18,25 @@
     "type": "custom",
     "usePuppeteer": false,
     "addedAt": "2025-12-13T14:09:53.558Z"
+  },
+  "switchsnow-thebase-in": {
+    "id": "switchsnow-thebase-in",
+    "name": "Switchsnow",
+    "baseUrl": "https://switchsnow.thebase.in/categories/2430208",
+    "currency": "JPY",
+    "country": "JP",
+    "type": "custom",
+    "usePuppeteer": true,
+    "addedAt": "2025-12-13T18:23:50.090Z"
+  },
+  "snowboardmds-thebase-in": {
+    "id": "snowboardmds-thebase-in",
+    "name": "Snowboardmds",
+    "baseUrl": "https://snowboardmds.thebase.in/categories/4415593",
+    "currency": "JPY",
+    "country": "JP",
+    "type": "custom",
+    "usePuppeteer": true,
+    "addedAt": "2025-12-13T18:31:26.106Z"
   }
 }

@@ -733,6 +733,12 @@
       border: 1px solid rgba(255, 107, 107, 0.3);
     }
 
+    .modal-result.warning {
+      display: block;
+      background: rgba(255, 193, 7, 0.15);
+      border: 1px solid rgba(255, 193, 7, 0.3);
+    }
+
     .modal-result h4 {
       margin-bottom: 8px;
     }
@@ -1046,14 +1052,14 @@
       <input type="text" id="searchInput" placeholder="品牌或商品名稱..." oninput="filterProducts()">
     </div>
     <div class="filter-group">
-      <label>價格範圍 (JPY)</label>
+      <label id="priceFilterLabel">價格範圍 (JPY)</label>
       <select id="priceFilter" onchange="filterProducts()">
         <option value="">全部價格</option>
-        <option value="0-30000">¥30,000 以下</option>
-        <option value="30000-50000">¥30,000 - ¥50,000</option>
-        <option value="50000-80000">¥50,000 - ¥80,000</option>
-        <option value="80000-100000">¥80,000 - ¥100,000</option>
-        <option value="100000-999999">¥100,000 以上</option>
+        <option value="0-30000" data-jpy="0-30000">¥30,000 以下</option>
+        <option value="30000-50000" data-jpy="30000-50000">¥30,000 - ¥50,000</option>
+        <option value="50000-80000" data-jpy="50000-80000">¥50,000 - ¥80,000</option>
+        <option value="80000-100000" data-jpy="80000-100000">¥80,000 - ¥100,000</option>
+        <option value="100000-999999" data-jpy="100000-999999">¥100,000 以上</option>
       </select>
     </div>
     <div class="filter-group">
@@ -1067,12 +1073,33 @@
       </div>
     </div>
     <div class="filter-group">
+      <label>裝備類型</label>
+      <select id="categoryFilter" onchange="filterProducts()">
+        <option value="all">全部裝備</option>
+        <option value="board" selected>雪板</option>
+        <option value="binding">固定器</option>
+        <option value="boots">雪靴</option>
+      </select>
+    </div>
+    <div class="filter-group">
       <label>排序方式</label>
       <select id="sortFilter" onchange="filterProducts()">
         <option value="price-asc">價格低到高</option>
         <option value="price-desc">價格高到低</option>
         <option value="stores-desc">比價店家多</option>
         <option value="name-asc">名稱 A-Z</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>顯示幣別</label>
+      <select id="currencyFilter" onchange="changeCurrency()">
+        <option value="JPY">🇯🇵 JPY 日圓</option>
+        <option value="TWD">🇹🇼 TWD 台幣</option>
+        <option value="USD">🇺🇸 USD 美元</option>
+        <option value="CAD">🇨🇦 CAD 加幣</option>
+        <option value="EUR">🇪🇺 EUR 歐元</option>
+        <option value="GBP">🇬🇧 GBP 英鎊</option>
+        <option value="AUD">🇦🇺 AUD 澳幣</option>
       </select>
     </div>
   </div>
@@ -1088,7 +1115,7 @@
         <div class="value" id="multiStoreCount">-</div>
       </div>
       <div class="summary-card">
-        <h3>平均最低價</h3>
+        <h3>價格範圍</h3>
         <div class="value" id="avgPrice">-</div>
       </div>
       <div class="summary-card">
@@ -1128,22 +1155,47 @@
 
       <!-- 新增店家分頁 -->
       <div class="tab-content" id="addStoreTab">
-        <form class="modal-form" onsubmit="submitAddStore(event)">
-          <div>
-            <label>店家網址 *</label>
-            <input type="url" id="storeUrl" placeholder="https://example.com/products" required>
-            <p class="modal-hint">請貼上該店家的商品列表頁面網址</p>
+        <!-- Step 1: 輸入網址 -->
+        <div id="addStoreStep1">
+          <form class="modal-form" onsubmit="exploreStoreCategories(event)">
+            <div>
+              <label>店家網址 *</label>
+              <input type="url" id="storeUrl" placeholder="https://example.com/products" required>
+              <p class="modal-hint">請貼上該店家的商品列表頁面網址</p>
+            </div>
+            <div>
+              <label>店家名稱 (選填)</label>
+              <input type="text" id="storeName" placeholder="會自動從網站偵測">
+              <p class="modal-hint">若不填寫，系統會自動從網址偵測店家名稱</p>
+            </div>
+            <div class="modal-buttons">
+              <button type="button" class="btn btn-cancel" onclick="closeStoreModal()">取消</button>
+              <button type="submit" class="btn btn-success" id="exploreStoreBtn">探索分類</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Step 2: 選擇分類 -->
+        <div id="addStoreStep2" style="display: none;">
+          <div class="modal-form">
+            <div style="margin-bottom: 15px;">
+              <h4 style="margin: 0 0 5px 0;" id="exploredStoreName">店家名稱</h4>
+              <p style="color: #888; font-size: 0.85rem; margin: 0;" id="exploredStoreUrl">網址</p>
+            </div>
+            <div>
+              <label>選擇要抓取的分類</label>
+              <div id="categoryList" style="max-height: 250px; overflow-y: auto; background: rgba(0,0,0,0.2); border-radius: 8px; padding: 10px;">
+                <!-- 分類清單會動態填入 -->
+              </div>
+              <p class="modal-hint">勾選你想要抓取的商品分類（如：雪板、固定器、雪靴等）</p>
+            </div>
+            <div class="modal-buttons">
+              <button type="button" class="btn btn-cancel" onclick="backToStep1()">上一步</button>
+              <button type="button" class="btn btn-success" id="addStoreSubmitBtn" onclick="submitAddStoreWithCategories()">新增店家</button>
+            </div>
           </div>
-          <div>
-            <label>店家名稱 (選填)</label>
-            <input type="text" id="storeName" placeholder="會自動從網站偵測">
-            <p class="modal-hint">若不填寫，系統會自動從網址偵測店家名稱</p>
-          </div>
-          <div class="modal-buttons">
-            <button type="button" class="btn btn-cancel" onclick="closeStoreModal()">取消</button>
-            <button type="submit" class="btn btn-success" id="addStoreSubmitBtn">新增店家</button>
-          </div>
-        </form>
+        </div>
+
         <div class="modal-result" id="addStoreResult"></div>
       </div>
     </div>
@@ -1156,18 +1208,101 @@
     let currentViewMode = 'grid';
     let currentFilteredProducts = [];
     let expandedProducts = new Set();
+    let currentCurrency = 'JPY';
 
-    // 格式化價格
+    // 幣別符號對照表
+    const currencySymbols = {
+      JPY: '¥',
+      TWD: 'NT$',
+      USD: '$',
+      CAD: 'C$',
+      EUR: '€',
+      GBP: '£',
+      AUD: 'A$'
+    };
+
+    // 幣別小數位數
+    const currencyDecimals = {
+      JPY: 0,
+      TWD: 0,
+      USD: 2,
+      CAD: 2,
+      EUR: 2,
+      GBP: 2,
+      AUD: 2
+    };
+
+    // 從 JPY 轉換到目標幣別
+    function convertFromJPY(amountJPY, toCurrency) {
+      if (!amountJPY || toCurrency === 'JPY') return amountJPY;
+      const rate = exchangeRates[toCurrency];
+      if (!rate) return amountJPY;
+      return amountJPY / rate;
+    }
+
+    // 切換幣別
+    function changeCurrency() {
+      currentCurrency = document.getElementById('currencyFilter').value;
+      updatePriceFilterOptions();
+      renderProducts(currentFilteredProducts);
+      updateSummary(currentFilteredProducts);
+    }
+
+    // 更新價格篩選選項的顯示
+    function updatePriceFilterOptions() {
+      const priceFilter = document.getElementById('priceFilter');
+      const priceFilterLabel = document.getElementById('priceFilterLabel');
+
+      // 更新標籤
+      priceFilterLabel.textContent = `價格範圍 (${currentCurrency})`;
+
+      // 價格區間定義 (以 JPY 為基準)
+      const priceRanges = [
+        { value: '0-30000', jpyMin: 0, jpyMax: 30000, labelKey: 'under' },
+        { value: '30000-50000', jpyMin: 30000, jpyMax: 50000, labelKey: 'range' },
+        { value: '50000-80000', jpyMin: 50000, jpyMax: 80000, labelKey: 'range' },
+        { value: '80000-100000', jpyMin: 80000, jpyMax: 100000, labelKey: 'range' },
+        { value: '100000-999999', jpyMin: 100000, jpyMax: 999999, labelKey: 'over' }
+      ];
+
+      // 更新各選項的顯示文字
+      const options = priceFilter.querySelectorAll('option[data-jpy]');
+      options.forEach((option, index) => {
+        const range = priceRanges[index];
+        const minConverted = convertFromJPY(range.jpyMin, currentCurrency);
+        const maxConverted = convertFromJPY(range.jpyMax, currentCurrency);
+
+        if (range.labelKey === 'under') {
+          option.textContent = `${formatPrice(maxConverted, currentCurrency)} 以下`;
+        } else if (range.labelKey === 'over') {
+          option.textContent = `${formatPrice(minConverted, currentCurrency)} 以上`;
+        } else {
+          option.textContent = `${formatPrice(minConverted, currentCurrency)} - ${formatPrice(maxConverted, currentCurrency)}`;
+        }
+      });
+    }
+
+    // 格式化價格 (使用指定幣別)
     function formatPrice(price, currency = 'JPY') {
       if (!price) return '-';
-      if (currency === 'JPY') {
-        return '¥' + Math.round(price).toLocaleString();
-      } else if (currency === 'CAD') {
-        return 'C$' + price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      } else if (currency === 'USD') {
-        return '$' + price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const symbol = currencySymbols[currency] || '';
+      const decimals = currencyDecimals[currency] || 0;
+
+      if (decimals === 0) {
+        return symbol + Math.round(price).toLocaleString();
+      } else {
+        return symbol + price.toLocaleString(undefined, {
+          minimumFractionDigits: decimals,
+          maximumFractionDigits: decimals
+        });
       }
-      return price.toLocaleString();
+    }
+
+    // 格式化價格 (顯示當前選擇的幣別，從 JPY 轉換)
+    function formatPriceInCurrentCurrency(priceJPY) {
+      if (!priceJPY) return '-';
+      const converted = convertFromJPY(priceJPY, currentCurrency);
+      return formatPrice(converted, currentCurrency);
     }
 
     // 格式化日期
@@ -1271,10 +1406,51 @@
     }
 
     // 篩選和排序商品
+    // 裝備類型分類 - 只依賴明確的關鍵字，避免型號名稱誤判
+    const categoryKeywords = {
+      binding: {
+        // 固定器關鍵字
+        include: ['binding', 'bindings', 'バインディング', 'ビンディング']
+      },
+      boots: {
+        // 雪靴關鍵字
+        include: ['boot', 'boots', 'ブーツ', 'snowboard boot']
+      }
+    };
+
+    function matchCategory(product, category) {
+      if (category === 'all') return true;
+
+      const name = ((product.brand || '') + ' ' + (product.name || '')).toLowerCase();
+
+      // 檢查是否包含固定器關鍵字
+      const hasBindingKeyword = categoryKeywords.binding.include.some(kw => name.includes(kw));
+      // 檢查是否包含雪靴關鍵字
+      const hasBootKeyword = categoryKeywords.boots.include.some(kw => name.includes(kw));
+
+      if (category === 'board') {
+        // 雪板：排除含有固定器或雪靴關鍵字的商品
+        return !hasBindingKeyword && !hasBootKeyword;
+      }
+
+      if (category === 'binding') {
+        // 固定器：必須包含固定器關鍵字
+        return hasBindingKeyword;
+      }
+
+      if (category === 'boots') {
+        // 雪靴：必須包含雪靴關鍵字
+        return hasBootKeyword;
+      }
+
+      return true;
+    }
+
     function filterProducts() {
       const search = document.getElementById('searchInput').value.toLowerCase();
       const priceRange = document.getElementById('priceFilter').value;
       const storeFilter = document.getElementById('storeFilter').value;
+      const categoryFilter = document.getElementById('categoryFilter').value;
       const sort = document.getElementById('sortFilter').value;
 
       let filtered = allProducts.filter(product => {
@@ -1299,7 +1475,10 @@
           matchStore = product.stores.some(s => s.store === storeFilter);
         }
 
-        return matchSearch && matchPrice && matchStore;
+        // 裝備類型篩選
+        const matchCat = matchCategory(product, categoryFilter);
+
+        return matchSearch && matchPrice && matchStore && matchCat;
       });
 
       // 排序
@@ -1329,13 +1508,22 @@
 
     // 更新統計摘要
     function updateSummary(products) {
-      const prices = products.filter(p => p.lowestPrice).map(p => p.lowestPrice);
+      const prices = products.filter(p => p.lowestPrice).map(p => p.lowestPrice).sort((a, b) => a - b);
       const multiStoreProducts = products.filter(p => p.storeCount > 1);
 
       document.getElementById('displayCount').textContent = products.length;
       document.getElementById('multiStoreCount').textContent = multiStoreProducts.length;
-      document.getElementById('avgPrice').textContent =
-        prices.length ? formatPrice(Math.round(prices.reduce((a, b) => a + b, 0) / prices.length)) : '-';
+
+      // 顯示價格範圍
+      if (prices.length > 0) {
+        const minPrice = prices[0];
+        const maxPrice = prices[prices.length - 1];
+        const minFormatted = formatPriceInCurrentCurrency(minPrice);
+        const maxFormatted = formatPriceInCurrentCurrency(maxPrice);
+        document.getElementById('avgPrice').textContent = `${minFormatted} - ${maxFormatted}`;
+      } else {
+        document.getElementById('avgPrice').textContent = '-';
+      }
       document.getElementById('storeCount').textContent = storesData.length;
     }
 
@@ -1362,19 +1550,25 @@
 
     // 渲染店家列表
     function renderStoreList(stores) {
-      return stores.map((store, index) => `
-        <div class="store-item ${index === 0 ? 'best-price' : ''}">
-          <span class="store-badge ${store.store}">${store.storeName}</span>
-          <div class="store-info">
-            <div class="store-currency">${store.currency}</div>
+      return stores.map((store, index) => {
+        const localPrice = store.salePrice || store.originalPrice;
+        const priceJPY = store.priceJPY || localPrice;
+        const convertedPrice = formatPriceInCurrentCurrency(priceJPY);
+
+        return `
+          <div class="store-item ${index === 0 ? 'best-price' : ''}">
+            <span class="store-badge ${store.store}">${store.storeName}</span>
+            <div class="store-info">
+              <div class="store-currency">${store.currency}</div>
+            </div>
+            <div class="store-price">
+              <div class="price-local">${convertedPrice}</div>
+              ${store.currency !== currentCurrency ? `<div class="price-jpy">${formatPrice(localPrice, store.currency)}</div>` : ''}
+            </div>
+            <a href="${store.productUrl}" target="_blank" rel="noopener" class="store-link">前往</a>
           </div>
-          <div class="store-price">
-            <div class="price-local">${formatPrice(store.salePrice || store.originalPrice, store.currency)}</div>
-            ${store.currency !== 'JPY' ? `<div class="price-jpy">≈ ${formatPrice(store.priceJPY)}</div>` : ''}
-          </div>
-          <a href="${store.productUrl}" target="_blank" rel="noopener" class="store-link">前往</a>
-        </div>
-      `).join('');
+        `;
+      }).join('');
     }
 
     // 卡片檢視
@@ -1397,7 +1591,7 @@
                     ${product.storeCount > 1 ? `<span class="multi-store-badge">${product.storeCount}店比價</span>` : ''}
                   </div>
                   <div class="product-price-summary">
-                    <span class="lowest-price">${formatPrice(product.lowestPrice)}</span>
+                    <span class="lowest-price">${formatPriceInCurrentCurrency(product.lowestPrice)}</span>
                     <span class="store-count">${product.lowestStore}</span>
                   </div>
                 </div>
@@ -1441,7 +1635,7 @@
                       </div>
                     </div>
                     <div class="product-price-info">
-                      <div class="lowest-price">${formatPrice(product.lowestPrice)}</div>
+                      <div class="lowest-price">${formatPriceInCurrentCurrency(product.lowestPrice)}</div>
                       <div class="lowest-store">${product.lowestStore}</div>
                     </div>
                   </div>
@@ -1638,18 +1832,105 @@
                 ${store.currency} | ${store.country || '未知地區'}
                 ${store.baseUrl ? ` | <a href="${store.baseUrl}" target="_blank" style="color: #00d2ff;">開啟網站</a>` : ''}
               </div>
+              ${store.categories && store.categories.length > 0 ? `
+                <div class="store-manage-categories" style="font-size: 0.75rem; color: #888; margin-top: 4px;">
+                  分類: ${store.categories.map(c => c.name).join(', ')}
+                </div>
+              ` : ''}
             </div>
             <div class="store-manage-actions">
               ${store.type === 'custom' ? `
+                <button class="btn-edit" onclick="editStoreCategories('${store.id}', '${store.name}')" style="background: #2196F3; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; margin-right: 5px;">分類</button>
                 <button class="btn-delete" onclick="deleteStoreFromModal('${store.id}', '${store.name}')">刪除</button>
               ` : `
-                <span style="color: rgba(255,255,255,0.4); font-size: 0.8rem;">不可刪除</span>
+                <span style="color: rgba(255,255,255,0.4); font-size: 0.8rem;">內建店家</span>
               `}
             </div>
           </div>
         `).join('');
       } catch (error) {
         container.innerHTML = `<div class="empty-stores">載入失敗: ${error.message}</div>`;
+      }
+    }
+
+    // 編輯店家分類
+    async function editStoreCategories(storeId, storeName) {
+      try {
+        // 先取得現有分類
+        const response = await fetch(`/api/stores/${storeId}/categories`);
+        const data = await response.json();
+
+        if (!response.ok) {
+          showToast(data.error || '無法取得分類資訊', 'error');
+          return;
+        }
+
+        // 顯示分類編輯 UI
+        const container = document.getElementById('storeListManage');
+        const currentCategories = data.categories || [];
+
+        container.innerHTML = `
+          <div style="padding: 15px;">
+            <h4 style="margin: 0 0 15px 0;">編輯「${storeName}」的分類</h4>
+            <div id="editCategoryList" style="max-height: 200px; overflow-y: auto; background: rgba(0,0,0,0.2); border-radius: 8px; padding: 10px;">
+              ${currentCategories.length > 0 ? currentCategories.map((cat, idx) => `
+                <label style="display: flex; align-items: center; padding: 8px; margin: 4px 0; background: rgba(255,255,255,0.05); border-radius: 6px; cursor: pointer;">
+                  <input type="checkbox" id="edit_cat_${idx}" data-category='${JSON.stringify(cat)}' checked style="margin-right: 10px; width: 18px; height: 18px;">
+                  <span style="flex: 1;">${cat.name}</span>
+                </label>
+              `).join('') : '<p style="color: #888; text-align: center;">尚無分類設定</p>'}
+            </div>
+            <p style="font-size: 0.8rem; color: #888; margin: 10px 0;">
+              提示：若要新增分類，請重新探索店家
+            </p>
+            <div style="display: flex; gap: 10px; margin-top: 15px;">
+              <button onclick="loadStoreList()" class="btn btn-cancel" style="flex: 1;">取消</button>
+              <button onclick="saveStoreCategories('${storeId}')" class="btn btn-success" style="flex: 1;">儲存變更</button>
+            </div>
+          </div>
+        `;
+      } catch (error) {
+        showToast('請求失敗: ' + error.message, 'error');
+      }
+    }
+
+    // 儲存店家分類設定
+    async function saveStoreCategories(storeId) {
+      const checkboxes = document.querySelectorAll('#editCategoryList input[type="checkbox"]');
+      const categories = [];
+
+      checkboxes.forEach(cb => {
+        if (cb.checked) {
+          try {
+            const cat = JSON.parse(cb.dataset.category);
+            categories.push({ ...cat, enabled: true });
+          } catch (e) {}
+        }
+      });
+
+      if (categories.length === 0) {
+        showToast('請至少選擇一個分類', 'error');
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/stores/${storeId}/categories`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ categories })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          showToast(`已更新分類設定，找到 ${data.productCount} 個商品`, 'success');
+          loadStoreList();
+          loadProducts();
+        } else {
+          showToast(data.error || '更新失敗', 'error');
+        }
+      } catch (error) {
+        showToast('請求失敗: ' + error.message, 'error');
       }
     }
 
@@ -1678,9 +1959,182 @@
       }
     }
 
-    // 提交新增店家
-    async function submitAddStore(event) {
-      event.preventDefault();
+    // 暫存探索結果
+    let currentExploration = null;
+
+    // Step 1: 探索店家分類
+    async function exploreStoreCategories(event) {
+      if (event) event.preventDefault();
+
+      const url = document.getElementById('storeUrl').value.trim();
+      const exploreBtn = document.getElementById('exploreStoreBtn');
+      const resultDiv = document.getElementById('addStoreResult');
+
+      if (!url) {
+        showToast('請輸入店家網址', 'error');
+        return;
+      }
+
+      exploreBtn.disabled = true;
+      exploreBtn.textContent = '探索中...';
+      resultDiv.className = 'modal-result';
+      resultDiv.innerHTML = '';
+
+      try {
+        const response = await fetch('/api/stores/explore', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          currentExploration = data;
+
+          // 顯示店家資訊
+          document.getElementById('exploredStoreName').textContent = data.storeName;
+          document.getElementById('exploredStoreUrl').textContent = data.baseUrl;
+
+          // 顯示分類清單
+          const categoryListDiv = document.getElementById('categoryList');
+
+          if (data.categories && data.categories.length > 0) {
+            categoryListDiv.innerHTML = data.categories.map((cat, idx) => `
+              <label style="display: flex; align-items: center; padding: 8px; margin: 4px 0; background: rgba(255,255,255,0.05); border-radius: 6px; cursor: pointer;">
+                <input type="checkbox" id="cat_${idx}" data-category-id="${cat.id}" ${cat.enabled ? 'checked' : ''} style="margin-right: 10px; width: 18px; height: 18px;">
+                <span style="flex: 1;">${cat.name}</span>
+              </label>
+            `).join('');
+          } else {
+            // 如果沒找到分類，提供「全部商品」選項
+            categoryListDiv.innerHTML = `
+              <label style="display: flex; align-items: center; padding: 8px; margin: 4px 0; background: rgba(255,255,255,0.05); border-radius: 6px; cursor: pointer;">
+                <input type="checkbox" id="cat_default" data-category-id="default" checked style="margin-right: 10px; width: 18px; height: 18px;">
+                <span style="flex: 1;">全部商品 (使用原始網址)</span>
+              </label>
+            `;
+            // 建立預設分類
+            currentExploration.categories = [{
+              id: 'default',
+              name: '全部商品',
+              url: url,
+              enabled: true
+            }];
+          }
+
+          // 切換到 Step 2
+          document.getElementById('addStoreStep1').style.display = 'none';
+          document.getElementById('addStoreStep2').style.display = 'block';
+
+          showToast(`找到 ${data.categories?.length || 0} 個分類`, 'success');
+        } else {
+          resultDiv.className = 'modal-result error';
+          resultDiv.innerHTML = `<h4>✗ 探索失敗</h4><p>${data.error}</p>`;
+          showToast(data.error, 'error');
+        }
+      } catch (error) {
+        resultDiv.className = 'modal-result error';
+        resultDiv.innerHTML = `<h4>✗ 請求失敗</h4><p>${error.message}</p>`;
+        showToast('請求失敗: ' + error.message, 'error');
+      } finally {
+        exploreBtn.disabled = false;
+        exploreBtn.textContent = '探索分類';
+      }
+    }
+
+    // 返回 Step 1
+    function backToStep1() {
+      document.getElementById('addStoreStep1').style.display = 'block';
+      document.getElementById('addStoreStep2').style.display = 'none';
+      document.getElementById('addStoreResult').className = 'modal-result';
+      document.getElementById('addStoreResult').innerHTML = '';
+      currentExploration = null;
+    }
+
+    // Step 2: 提交新增店家 (含分類)
+    async function submitAddStoreWithCategories() {
+      if (!currentExploration) {
+        showToast('請先探索店家分類', 'error');
+        return;
+      }
+
+      const submitBtn = document.getElementById('addStoreSubmitBtn');
+      const resultDiv = document.getElementById('addStoreResult');
+      const customName = document.getElementById('storeName').value.trim();
+
+      // 取得選中的分類
+      const selectedCategories = [];
+      currentExploration.categories.forEach((cat, idx) => {
+        const checkbox = document.getElementById(`cat_${idx}`) || document.getElementById('cat_default');
+        if (checkbox && checkbox.checked) {
+          selectedCategories.push({ ...cat, enabled: true });
+        }
+      });
+
+      if (selectedCategories.length === 0) {
+        showToast('請至少選擇一個分類', 'error');
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = '新增中...';
+      resultDiv.className = 'modal-result';
+      resultDiv.innerHTML = '';
+
+      try {
+        const response = await fetch('/api/stores/with-categories', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            url: currentExploration.originalUrl,
+            name: customName || null,
+            categories: selectedCategories
+          })
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+          resultDiv.className = 'modal-result success';
+          resultDiv.innerHTML = `
+            <h4>✓ 新增成功!</h4>
+            <p><strong>店家:</strong> ${data.store.name}</p>
+            <p><strong>分類:</strong> ${data.categories?.map(c => c.name).join(', ') || '全部'}</p>
+            <p><strong>找到商品:</strong> ${data.productCount} 件</p>
+            ${data.sampleProducts && data.sampleProducts.length > 0 ? `
+              <p style="margin-top: 10px;"><strong>範例商品:</strong></p>
+              <ul style="margin-left: 20px; font-size: 0.85rem;">
+                ${data.sampleProducts.map(p => `<li>${p.brand || ''} ${p.name}</li>`).join('')}
+              </ul>
+            ` : ''}
+          `;
+          showToast(`已新增店家: ${data.store.name}`, 'success');
+
+          // 2秒後關閉並重新載入
+          setTimeout(() => {
+            closeStoreModal();
+            backToStep1();
+            loadProducts();
+          }, 2000);
+        } else {
+          resultDiv.className = 'modal-result error';
+          resultDiv.innerHTML = `<h4>✗ 新增失敗</h4><p>${data.error}</p>`;
+          showToast(data.error, 'error');
+        }
+      } catch (error) {
+        resultDiv.className = 'modal-result error';
+        resultDiv.innerHTML = `<h4>✗ 請求失敗</h4><p>${error.message}</p>`;
+        showToast('請求失敗: ' + error.message, 'error');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = '新增店家';
+      }
+    }
+
+    // 舊版提交新增店家 (保留相容性)
+    async function submitAddStore(event, forceAccept = false) {
+      if (event) event.preventDefault();
 
       const url = document.getElementById('storeUrl').value.trim();
       const name = document.getElementById('storeName').value.trim();
@@ -1693,7 +2147,7 @@
       }
 
       submitBtn.disabled = true;
-      submitBtn.textContent = '偵測中...';
+      submitBtn.textContent = forceAccept ? '確認新增中...' : '偵測中...';
       resultDiv.className = 'modal-result';
       resultDiv.innerHTML = '';
 
@@ -1703,19 +2157,75 @@
           headers: {
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({ url, name: name || null })
+          body: JSON.stringify({ url, name: name || null, forceAccept })
         });
 
         const data = await response.json();
 
+        // 處理需要確認的情況 (HTTP 202)
+        if (response.status === 202 && data.requiresConfirmation) {
+          const v = data.validation;
+          resultDiv.className = 'modal-result warning';
+          resultDiv.innerHTML = `
+            <h4>⚠️ 需要確認</h4>
+            <p>${data.message}</p>
+            <div style="margin: 10px 0; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 6px;">
+              <p style="font-size: 0.85rem; margin-bottom: 8px;"><strong>📊 交叉驗證結果:</strong></p>
+              <p style="font-size: 0.8rem; margin: 2px 0;">• 主要方法 (${v.primary.method}): ${v.primary.count} 件</p>
+              <p style="font-size: 0.8rem; margin: 2px 0;">• 驗證方法 (${v.secondary.method}): ${v.secondary.count} 件</p>
+              <p style="font-size: 0.8rem; margin: 2px 0;">• 差異: ${v.differencePercent.toFixed(1)}%</p>
+              <hr style="border: none; border-top: 1px solid rgba(255,255,255,0.2); margin: 8px 0;">
+              <p style="font-size: 0.8rem; margin: 2px 0;"><strong>合併後商品數:</strong> ${v.merged.count} 件</p>
+              <p style="font-size: 0.75rem; color: #aaa; margin: 2px 0;">
+                (主要獨有: ${v.details.onlyInPrimary} | 驗證獨有: ${v.details.onlyInSecondary} | 共有: ${v.details.inBoth})
+              </p>
+              ${v.warnings && v.warnings.length > 0 ? `
+                <div style="margin-top: 8px; padding: 6px; background: rgba(255,193,7,0.2); border-radius: 4px;">
+                  <p style="font-size: 0.75rem; color: #ffc107;">${v.warnings.join('<br>')}</p>
+                </div>
+              ` : ''}
+            </div>
+            ${data.preview && data.preview.sampleProducts && data.preview.sampleProducts.length > 0 ? `
+              <p style="margin-top: 10px;"><strong>範例商品:</strong></p>
+              <ul style="margin-left: 20px; font-size: 0.85rem; max-height: 100px; overflow-y: auto;">
+                ${data.preview.sampleProducts.map(p => `<li>${p.brand || ''} ${p.name}</li>`).join('')}
+              </ul>
+            ` : ''}
+            <div style="margin-top: 15px; display: flex; gap: 10px;">
+              <button type="button" onclick="confirmAddStore()" class="btn btn-primary" style="flex: 1;">
+                確認新增 (${v.merged.count} 件商品)
+              </button>
+              <button type="button" onclick="cancelAddStore()" class="btn btn-secondary" style="flex: 1;">
+                取消
+              </button>
+            </div>
+          `;
+          showToast('交叉驗證發現差異，請確認是否繼續', 'info');
+          submitBtn.disabled = false;
+          submitBtn.textContent = '新增店家';
+          return;
+        }
+
         if (response.ok) {
-          resultDiv.className = 'modal-result success';
+          const validation = data.validation || {};
+
+          resultDiv.className = `modal-result success`;
           resultDiv.innerHTML = `
             <h4>✓ 新增成功!</h4>
             <p><strong>店家:</strong> ${data.store.name}</p>
             <p><strong>找到商品:</strong> ${data.productCount} 件</p>
+            ${validation.merged ? `
+              <div style="margin: 10px 0; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 6px;">
+                <p style="font-size: 0.85rem; margin-bottom: 5px;"><strong>📊 交叉驗證結果:</strong></p>
+                <p style="font-size: 0.8rem; margin: 2px 0;">
+                  • 狀態: ${validation.status === 'auto_merged' ? '✓ 自動合併' : validation.status === 'merged_with_warning' ? '⚠️ 合併（有警告）' : validation.status === 'skipped_js_only' ? 'ℹ️ 純 JS 網站（跳過驗證）' : '✓ 確認合併'}
+                </p>
+                <p style="font-size: 0.8rem; margin: 2px 0;">• 差異: ${(validation.differencePercent || 0).toFixed(1)}%</p>
+                <p style="font-size: 0.8rem; margin: 2px 0;">• 合併商品: ${validation.merged.count} 件 (主要: ${validation.merged.fromPrimary} + 驗證: ${validation.merged.fromSecondary})</p>
+              </div>
+            ` : ''}
             ${data.sampleProducts && data.sampleProducts.length > 0 ? `
-              <p><strong>範例商品:</strong></p>
+              <p style="margin-top: 10px;"><strong>範例商品:</strong></p>
               <ul style="margin-left: 20px; font-size: 0.85rem;">
                 ${data.sampleProducts.map(p => `<li>${p.brand || ''} ${p.name} - ${formatPrice(p.salePrice || p.originalPrice, data.store.currency)}</li>`).join('')}
               </ul>
@@ -1747,6 +2257,21 @@
         submitBtn.disabled = false;
         submitBtn.textContent = '新增店家';
       }
+    }
+
+    // 確認新增店家（差異過大時的人工確認）
+    function confirmAddStore() {
+      submitAddStore(null, true);
+    }
+
+    // 取消新增店家
+    function cancelAddStore() {
+      const resultDiv = document.getElementById('addStoreResult');
+      resultDiv.className = 'modal-result';
+      resultDiv.innerHTML = '';
+      document.getElementById('storeUrl').value = '';
+      document.getElementById('storeName').value = '';
+      showToast('已取消新增', 'info');
     }
 
     // 刪除自訂店家

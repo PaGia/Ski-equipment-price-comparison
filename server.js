@@ -5,6 +5,9 @@ const cron = require('node-cron');
 const {
   scrapeAll,
   addCustomStore,
+  addCustomStoreWithCategories,
+  exploreStoreCategories,
+  updateStoreCategories,
   removeCustomStore,
   getAllStores,
   getProgress,
@@ -12,7 +15,7 @@ const {
 } = require('./scraper');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 
 // 中間件
 app.use(express.json());
@@ -65,7 +68,7 @@ app.post('/api/stores', async (req, res) => {
     return res.status(429).json({ error: '正在處理中，請稍後再試' });
   }
 
-  const { url, name } = req.body;
+  const { url, name, forceAccept } = req.body;
 
   if (!url) {
     return res.status(400).json({ error: '請提供網址' });
@@ -81,14 +84,58 @@ app.post('/api/stores', async (req, res) => {
   isAddingStore = true;
 
   try {
-    const result = await addCustomStore(url, name);
-    res.json({
-      success: true,
-      message: `成功新增店家: ${result.store.name}`,
-      store: result.store,
-      productCount: result.productCount,
-      sampleProducts: result.sampleProducts
-    });
+    const result = await addCustomStore(url, name, { forceAccept: !!forceAccept });
+
+    // 檢查是否需要人工確認
+    if (result.requiresConfirmation) {
+      res.status(202).json({
+        requiresConfirmation: true,
+        message: result.message,
+        store: result.store,
+        validation: {
+          status: result.validation.status,
+          differencePercent: result.validation.differencePercent,
+          primary: {
+            method: result.validation.primary.method,
+            count: result.validation.primary.count
+          },
+          secondary: {
+            method: result.validation.secondary.method,
+            count: result.validation.secondary.count
+          },
+          merged: {
+            count: result.validation.merged.count,
+            fromPrimary: result.validation.merged.fromPrimary,
+            fromSecondary: result.validation.merged.fromSecondary
+          },
+          warnings: result.validation.warnings || [],
+          details: {
+            onlyInPrimary: result.validation.details.onlyInPrimary.length,
+            onlyInSecondary: result.validation.details.onlyInSecondary.length,
+            inBoth: result.validation.details.inBoth.length,
+            priceDiscrepancies: result.validation.details.priceDiscrepancies.length
+          }
+        },
+        preview: result.preview
+      });
+    } else {
+      res.json({
+        success: true,
+        message: `成功新增店家: ${result.store.name}`,
+        store: result.store,
+        productCount: result.productCount,
+        sampleProducts: result.sampleProducts,
+        validation: result.validation ? {
+          status: result.validation.status,
+          differencePercent: result.validation.differencePercent,
+          merged: {
+            count: result.validation.merged.count,
+            fromPrimary: result.validation.merged.fromPrimary,
+            fromSecondary: result.validation.merged.fromSecondary
+          }
+        } : null
+      });
+    }
   } catch (error) {
     res.status(400).json({ error: error.message });
   } finally {
@@ -114,14 +161,124 @@ app.delete('/api/stores/:id', (req, res) => {
   }
 });
 
+// API: 探索店家分類
+app.post('/api/stores/explore', async (req, res) => {
+  const { url } = req.body;
+
+  if (!url) {
+    return res.status(400).json({ error: '請提供網址' });
+  }
+
+  try {
+    new URL(url);
+  } catch (e) {
+    return res.status(400).json({ error: '無效的網址格式' });
+  }
+
+  try {
+    const result = await exploreStoreCategories(url);
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// API: 新增店家 (支援分類選擇)
+let isAddingStoreWithCategories = false;
+app.post('/api/stores/with-categories', async (req, res) => {
+  if (isAddingStoreWithCategories) {
+    return res.status(429).json({ error: '正在處理中，請稍後再試' });
+  }
+
+  const { url, name, categories } = req.body;
+
+  if (!url) {
+    return res.status(400).json({ error: '請提供網址' });
+  }
+
+  try {
+    new URL(url);
+  } catch (e) {
+    return res.status(400).json({ error: '無效的網址格式' });
+  }
+
+  isAddingStoreWithCategories = true;
+
+  try {
+    const result = await addCustomStoreWithCategories(url, name, categories || []);
+
+    // 如果需要選擇分類
+    if (result.requiresCategorySelection) {
+      res.status(202).json({
+        requiresCategorySelection: true,
+        message: result.message,
+        exploration: result.exploration
+      });
+    } else {
+      res.json({
+        success: true,
+        message: `成功新增店家: ${result.store.name}`,
+        store: result.store,
+        productCount: result.productCount,
+        categories: result.categories,
+        sampleProducts: result.sampleProducts
+      });
+    }
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  } finally {
+    isAddingStoreWithCategories = false;
+  }
+});
+
+// API: 更新店家分類設定
+app.put('/api/stores/:id/categories', async (req, res) => {
+  const { id } = req.params;
+  const { categories } = req.body;
+
+  if (!categories || !Array.isArray(categories)) {
+    return res.status(400).json({ error: '請提供分類列表' });
+  }
+
+  try {
+    const result = await updateStoreCategories(id, categories);
+    res.json({
+      success: true,
+      message: `已更新店家分類設定`,
+      store: result.store,
+      productCount: result.productCount,
+      categories: result.categories
+    });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// API: 獲取店家分類
+app.get('/api/stores/:id/categories', (req, res) => {
+  const { id } = req.params;
+  const stores = getAllStores();
+
+  if (!stores[id]) {
+    return res.status(404).json({ error: '找不到該店家' });
+  }
+
+  const store = stores[id];
+  res.json({
+    storeId: id,
+    storeName: store.name,
+    categories: store.categories || []
+  });
+});
+
 // API: 手動觸發抓取
-let isScaping = false;
+let isScraping = false;
 app.post('/api/scrape', async (req, res) => {
-  if (isScaping) {
+  if (isScraping) {
     return res.status(429).json({ error: '抓取程序正在執行中，請稍後再試' });
   }
 
-  isScaping = true;
+  isScraping = true;
   res.json({ message: '抓取已開始，請稍候...' });
 
   try {
@@ -135,7 +292,7 @@ app.post('/api/scrape', async (req, res) => {
   } catch (error) {
     console.error('抓取錯誤:', error);
   } finally {
-    isScaping = false;
+    isScraping = false;
   }
 });
 
@@ -143,7 +300,7 @@ app.post('/api/scrape', async (req, res) => {
 app.get('/api/status', (req, res) => {
   const progress = getProgress();
   res.json({
-    isScaping,
+    isScraping,
     isAddingStore,
     dataExists: fs.existsSync(DATA_FILE),
     lastUpdated: fs.existsSync(DATA_FILE)
@@ -166,15 +323,15 @@ app.get('/api/status', (req, res) => {
 // 定時任務：每天早上 6 點自動抓取
 cron.schedule('0 6 * * *', async () => {
   console.log('執行定時抓取任務...');
-  if (!isScaping) {
-    isScaping = true;
+  if (!isScraping) {
+    isScraping = true;
     try {
       await scrapeAll();
       console.log('定時抓取完成');
     } catch (error) {
       console.error('定時抓取錯誤:', error);
     } finally {
-      isScaping = false;
+      isScraping = false;
     }
   }
 }, {
