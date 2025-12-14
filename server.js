@@ -143,25 +143,7 @@ app.post('/api/stores', async (req, res) => {
   }
 });
 
-// API: 刪除自訂店家
-app.delete('/api/stores/:id', (req, res) => {
-  const { id } = req.params;
-
-  // 不能刪除內建店家
-  const stores = getAllStores();
-  if (stores[id] && stores[id].type !== 'custom') {
-    return res.status(400).json({ error: '無法刪除內建店家' });
-  }
-
-  const success = removeCustomStore(id);
-  if (success) {
-    res.json({ success: true, message: `已刪除店家: ${id}` });
-  } else {
-    res.status(404).json({ error: '找不到該店家' });
-  }
-});
-
-// API: 探索店家分類
+// API: 探索店家分類 (必須在 /api/stores/:id 之前)
 app.post('/api/stores/explore', async (req, res) => {
   const { url } = req.body;
 
@@ -183,7 +165,7 @@ app.post('/api/stores/explore', async (req, res) => {
   }
 });
 
-// API: 新增店家 (支援分類選擇)
+// API: 新增店家 (支援分類選擇) - 必須在 /api/stores/:id 之前
 let isAddingStoreWithCategories = false;
 app.post('/api/stores/with-categories', async (req, res) => {
   if (isAddingStoreWithCategories) {
@@ -231,7 +213,24 @@ app.post('/api/stores/with-categories', async (req, res) => {
   }
 });
 
-// API: 更新店家分類設定
+// API: 獲取店家分類 (必須在 /api/stores/:id 之前)
+app.get('/api/stores/:id/categories', (req, res) => {
+  const { id } = req.params;
+  const stores = getAllStores();
+
+  if (!stores[id]) {
+    return res.status(404).json({ error: '找不到該店家' });
+  }
+
+  const store = stores[id];
+  res.json({
+    storeId: id,
+    storeName: store.name,
+    categories: store.categories || []
+  });
+});
+
+// API: 更新店家分類設定 (必須在 /api/stores/:id 之前)
 app.put('/api/stores/:id/categories', async (req, res) => {
   const { id } = req.params;
   const { categories } = req.body;
@@ -254,21 +253,22 @@ app.put('/api/stores/:id/categories', async (req, res) => {
   }
 });
 
-// API: 獲取店家分類
-app.get('/api/stores/:id/categories', (req, res) => {
+// API: 刪除自訂店家
+app.delete('/api/stores/:id', (req, res) => {
   const { id } = req.params;
-  const stores = getAllStores();
 
-  if (!stores[id]) {
-    return res.status(404).json({ error: '找不到該店家' });
+  // 不能刪除內建店家
+  const stores = getAllStores();
+  if (stores[id] && stores[id].type !== 'custom') {
+    return res.status(400).json({ error: '無法刪除內建店家' });
   }
 
-  const store = stores[id];
-  res.json({
-    storeId: id,
-    storeName: store.name,
-    categories: store.categories || []
-  });
+  const success = removeCustomStore(id);
+  if (success) {
+    res.json({ success: true, message: `已刪除店家: ${id}` });
+  } else {
+    res.status(404).json({ error: '找不到該店家' });
+  }
 });
 
 // API: 手動觸發抓取

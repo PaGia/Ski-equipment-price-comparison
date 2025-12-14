@@ -2,12 +2,30 @@
   "sportsbomber-base-shop": {
     "id": "sportsbomber-base-shop",
     "name": "Sportsbomber",
-    "baseUrl": "https://sportsbomber.base.shop/categories/2746389",
+    "baseUrl": "https://sportsbomber.base.shop",
     "currency": "JPY",
     "country": "JP",
     "type": "custom",
     "usePuppeteer": true,
-    "addedAt": "2025-12-13T13:18:08.606Z"
+    "categories": [
+      {
+        "id": "2746389",
+        "name": "スノーボード",
+        "originalName": "スノーボード",
+        "url": "https://sportsbomber.base.shop/categories/2746389",
+        "type": "スノーボード",
+        "enabled": true
+      },
+      {
+        "id": "6735410",
+        "name": "ヘルメット",
+        "originalName": "ヘルメット",
+        "url": "https://sportsbomber.base.shop/categories/6735410",
+        "type": "ヘルメット",
+        "enabled": true
+      }
+    ],
+    "addedAt": "2025-12-14T10:12:06.757Z"
   },
   "comorsports-com": {
     "id": "comorsports-com",
@@ -22,12 +40,30 @@
   "switchsnow-thebase-in": {
     "id": "switchsnow-thebase-in",
     "name": "Switchsnow",
-    "baseUrl": "https://switchsnow.thebase.in/categories/2430208",
+    "baseUrl": "https://switchsnow.thebase.in",
     "currency": "JPY",
     "country": "JP",
     "type": "custom",
     "usePuppeteer": true,
-    "addedAt": "2025-12-13T18:23:50.090Z"
+    "categories": [
+      {
+        "id": "2430208",
+        "name": "スノーボード",
+        "originalName": "スノーボード",
+        "url": "https://switchsnow.thebase.in/categories/2430208",
+        "type": "スノーボード",
+        "enabled": true
+      },
+      {
+        "id": "2492359",
+        "name": "ヘルメット",
+        "originalName": "ヘルメット",
+        "url": "https://switchsnow.thebase.in/categories/2492359",
+        "type": "ヘルメット",
+        "enabled": true
+      }
+    ],
+    "addedAt": "2025-12-14T11:12:49.849Z"
   },
   "snowboardmds-thebase-in": {
     "id": "snowboardmds-thebase-in",

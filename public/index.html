@@ -1076,9 +1076,7 @@
       <label>裝備類型</label>
       <select id="categoryFilter" onchange="filterProducts()">
         <option value="all">全部裝備</option>
-        <option value="board" selected>雪板</option>
-        <option value="binding">固定器</option>
-        <option value="boots">雪靴</option>
+        <!-- 動態填充分類選項 -->
       </select>
     </div>
     <div class="filter-group">
@@ -1391,6 +1389,8 @@
           document.getElementById('summaryCards').style.display = 'none';
         } else {
           document.getElementById('summaryCards').style.display = 'grid';
+          // 更新分類篩選選單
+          updateCategoryFilter();
           filterProducts();
         }
       } catch (error) {
@@ -1406,41 +1406,146 @@
     }
 
     // 篩選和排序商品
-    // 裝備類型分類 - 只依賴明確的關鍵字，避免型號名稱誤判
-    const categoryKeywords = {
-      binding: {
-        // 固定器關鍵字
-        include: ['binding', 'bindings', 'バインディング', 'ビンディング']
-      },
-      boots: {
-        // 雪靴關鍵字
-        include: ['boot', 'boots', 'ブーツ', 'snowboard boot']
-      }
+    // 分類名稱對應 (標準化不同語言的分類名稱)
+    const categoryMapping = {
+      // 雪板
+      'スノーボード': 'snowboard',
+      'ボード': 'snowboard',
+      'snowboard': 'snowboard',
+      'snowboards': 'snowboard',
+      'board': 'snowboard',
+      // 固定器
+      'バインディング': 'binding',
+      'ビンディング': 'binding',
+      'binding': 'binding',
+      'bindings': 'binding',
+      // 雪靴
+      'ブーツ': 'boots',
+      'boot': 'boots',
+      'boots': 'boots',
+      // 安全帽
+      'ヘルメット': 'helmet',
+      'helmet': 'helmet',
+      'helmets': 'helmet',
+      // 護目鏡
+      'ゴーグル': 'goggle',
+      'goggle': 'goggle',
+      'goggles': 'goggle',
+      // 手套
+      'グローブ': 'glove',
+      'glove': 'glove',
+      'gloves': 'glove',
+      // 服裝
+      'ウェア': 'wear',
+      'wear': 'wear',
+      'ジャケット': 'jacket',
+      'jacket': 'jacket',
+      'パンツ': 'pants',
+      'pants': 'pants',
+      // 配件
+      'アクセサリー': 'accessory',
+      'accessory': 'accessory',
+      'accessories': 'accessory'
     };
+
+    // 分類顯示名稱
+    const categoryDisplayNames = {
+      'snowboard': '雪板',
+      'binding': '固定器',
+      'boots': '雪靴',
+      'helmet': '安全帽',
+      'goggle': '護目鏡',
+      'glove': '手套',
+      'wear': '服裝',
+      'jacket': '外套',
+      'pants': '雪褲',
+      'accessory': '配件'
+    };
+
+    // 標準化分類名稱
+    function normalizeCategory(categoryName) {
+      if (!categoryName) return null;
+      const lower = categoryName.toLowerCase();
+      return categoryMapping[lower] || categoryMapping[categoryName] || categoryName;
+    }
+
+    // 更新分類篩選選單
+    function updateCategoryFilter() {
+      const categoryFilter = document.getElementById('categoryFilter');
+      const currentValue = categoryFilter.value;
+
+      // 收集所有商品的分類
+      const allCategories = new Set();
+      allProducts.forEach(product => {
+        if (product.categories && product.categories.length > 0) {
+          product.categories.forEach(cat => {
+            const normalized = normalizeCategory(cat);
+            if (normalized) allCategories.add(normalized);
+          });
+        }
+      });
+
+      // 保留「全部裝備」選項
+      categoryFilter.innerHTML = '<option value="all">全部裝備</option>';
+
+      // 定義排序順序
+      const categoryOrder = ['snowboard', 'binding', 'boots', 'helmet', 'goggle', 'glove', 'wear', 'jacket', 'pants', 'accessory'];
+
+      // 按順序添加分類選項
+      categoryOrder.forEach(cat => {
+        if (allCategories.has(cat)) {
+          const option = document.createElement('option');
+          option.value = cat;
+          option.textContent = categoryDisplayNames[cat] || cat;
+          categoryFilter.appendChild(option);
+        }
+      });
+
+      // 添加其他未在預設順序中的分類
+      allCategories.forEach(cat => {
+        if (!categoryOrder.includes(cat)) {
+          const option = document.createElement('option');
+          option.value = cat;
+          option.textContent = categoryDisplayNames[cat] || cat;
+          categoryFilter.appendChild(option);
+        }
+      });
+
+      // 如果之前選擇的值還存在，恢復選擇
+      if (currentValue && Array.from(categoryFilter.options).some(opt => opt.value === currentValue)) {
+        categoryFilter.value = currentValue;
+      } else if (allCategories.has('snowboard')) {
+        // 預設選擇雪板
+        categoryFilter.value = 'snowboard';
+      }
+    }
 
     function matchCategory(product, category) {
       if (category === 'all') return true;
 
+      // 如果商品有分類資訊，根據分類篩選
+      if (product.categories && product.categories.length > 0) {
+        return product.categories.some(cat => normalizeCategory(cat) === category);
+      }
+
+      // 如果沒有分類資訊，使用關鍵字匹配（向後相容舊資料）
       const name = ((product.brand || '') + ' ' + (product.name || '')).toLowerCase();
 
-      // 檢查是否包含固定器關鍵字
-      const hasBindingKeyword = categoryKeywords.binding.include.some(kw => name.includes(kw));
-      // 檢查是否包含雪靴關鍵字
-      const hasBootKeyword = categoryKeywords.boots.include.some(kw => name.includes(kw));
+      // 關鍵字匹配
+      const keywords = {
+        snowboard: ['snowboard', 'ボード', 'スノーボード', '板'],
+        binding: ['binding', 'bindings', 'バインディング', 'ビンディング'],
+        boots: ['boot', 'boots', 'ブーツ'],
+        helmet: ['helmet', 'ヘルメット'],
+        goggle: ['goggle', 'ゴーグル'],
+        glove: ['glove', 'グローブ'],
+        wear: ['wear', 'ウェア'],
+        jacket: ['jacket', 'ジャケット'],
+        pants: ['pant', 'pants', 'パンツ']
+      };
 
-      if (category === 'board') {
-        // 雪板：排除含有固定器或雪靴關鍵字的商品
-        return !hasBindingKeyword && !hasBootKeyword;
-      }
-
-      if (category === 'binding') {
-        // 固定器：必須包含固定器關鍵字
-        return hasBindingKeyword;
-      }
-
-      if (category === 'boots') {
-        // 雪靴：必須包含雪靴關鍵字
-        return hasBootKeyword;
+      if (keywords[category]) {
+        return keywords[category].some(kw => name.includes(kw));
       }
 
       return true;

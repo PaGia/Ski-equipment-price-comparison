@@ -2185,7 +2185,8 @@ function mergeProducts(allStoreProducts) {
         name: product.name,
         normalizedName: normalizeProductName(product.brand, product.name),
         imageUrl: product.imageUrl,
-        stores: []
+        stores: [],
+        categories: new Set() // 收集所有分類
       });
     }
 
@@ -2193,6 +2194,11 @@ function mergeProducts(allStoreProducts) {
 
     if (!merged.imageUrl && product.imageUrl) {
       merged.imageUrl = product.imageUrl;
+    }
+
+    // 收集分類資訊
+    if (product.categoryName) {
+      merged.categories.add(product.categoryName);
     }
 
     merged.stores.push({
@@ -2204,7 +2210,9 @@ function mergeProducts(allStoreProducts) {
       priceJPY: product.priceJPY,
       discount: product.discount,
       productUrl: product.productUrl,
-      scrapedAt: product.scrapedAt
+      scrapedAt: product.scrapedAt,
+      categoryId: product.categoryId,
+      categoryName: product.categoryName
     });
   }
 
@@ -2217,6 +2225,9 @@ function mergeProducts(allStoreProducts) {
     product.highestPrice = prices.length ? Math.max(...prices) : null;
     product.lowestStore = product.stores[0]?.storeName || '';
     product.storeCount = product.stores.length;
+
+    // 將 Set 轉換為陣列
+    product.categories = Array.from(product.categories);
 
     result.push(product);
   }
@@ -2773,6 +2784,29 @@ async function exploreStoreCategories(url) {
       const found = [];
       const seen = new Set();
 
+      // 純商品類型名稱 (只接受這些精確名稱或非常相近的變體)
+      // 格式: { 顯示名稱: [可接受的名稱變體] }
+      const acceptedCategories = {
+        // 雪板
+        'スノーボード': ['snowboard', 'snowboards', 'スノーボード', 'ボード', 'board', 'boards'],
+        // 固定器
+        'バインディング': ['binding', 'bindings', 'バインディング', 'バイン', 'ビンディング'],
+        // 雪靴
+        'ブーツ': ['boot', 'boots', 'ブーツ', 'スノーボードブーツ'],
+        // 服裝
+        'ウェア': ['wear', 'ウェア', 'apparel', 'clothing'],
+        'ジャケット': ['jacket', 'jackets', 'ジャケット'],
+        'パンツ': ['pant', 'pants', 'パンツ'],
+        // 護具
+        'ヘルメット': ['helmet', 'helmets', 'ヘルメット'],
+        'ゴーグル': ['goggle', 'goggles', 'ゴーグル'],
+        'グローブ': ['glove', 'gloves', 'グローブ'],
+        'プロテクター': ['protector', 'protectors', 'プロテクター', 'protection'],
+        // 配件
+        'アクセサリー': ['accessory', 'accessories', 'アクセサリー', '小物'],
+        'バッグ': ['bag', 'bags', 'バッグ']
+      };
+
       // 方法1: 找分類連結 (BASE 平台)
       const categorySelectors = [
         'a[href*="/categories/"]',
@@ -2803,6 +2837,29 @@ async function exploreStoreCategories(url) {
               return;
             }
 
+            // 檢查是否為「純商品類型」分類 (精確匹配)
+            let matchedCategory = null;
+            let displayName = null;
+
+            for (const [catName, variants] of Object.entries(acceptedCategories)) {
+              for (const variant of variants) {
+                // 精確匹配：分類名稱必須等於或非常接近變體名稱
+                // 例如：「スノーボード」OK，「GT snowboard」不OK
+                const variantLower = variant.toLowerCase();
+                if (lowerName === variantLower ||
+                    lowerName === variantLower + 's' ||
+                    lowerName.replace(/\s+/g, '') === variantLower.replace(/\s+/g, '')) {
+                  matchedCategory = variant;
+                  displayName = catName;
+                  break;
+                }
+              }
+              if (matchedCategory) break;
+            }
+
+            // 只加入精確匹配的商品類型分類
+            if (!matchedCategory) return;
+
             // 建立完整 URL
             let fullUrl = href;
             if (href.startsWith('/')) {
@@ -2823,8 +2880,10 @@ async function exploreStoreCategories(url) {
               seen.add(key);
               found.push({
                 id: categoryId || key,
-                name: name,
+                name: displayName || name, // 使用標準化名稱
+                originalName: name, // 保留原始名稱
                 url: fullUrl,
+                type: matchedCategory,
                 enabled: false // 預設不啟用
               });
             }
