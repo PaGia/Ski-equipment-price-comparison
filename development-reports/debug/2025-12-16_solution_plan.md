@@ -81,3 +81,173 @@
 **執行順序**:
 1. **優先執行**: Shopify 爬蟲修復 (North Shore/Comorsports)，因為這能立即找回遺失的商品。
 2. **次要執行**: Puppeteer 自動導航 (Sportsbomber)，這需要較複雜的邏輯變更。
+
+---
+
+## 📋 執行結果 (2025-12-16)
+
+**狀態**: ❌ **未解決** - 所有問題在執行 solution plan 後依然存在
+
+### 持續存在的問題:
+1. **Comorsports & Switchsnow**:
+   - 未勾選固定器分類時仍被導入系統
+   - 勾選固定器後依然無法正確分類
+   
+2. **North Shore**:
+   - 滑板商品未被正確分類到「雪板」分類
+   - 所有固定器商品完全未被導入
+   
+3. **Sportsbomber**:
+   - 僅導入 1 件商品，遠低於預期數量
+   
+4. **店家管理**:
+   - 分類 URL 設定依然存在且在使用中
+   - 未實現統一使用全域分類設定的目標
+
+**結論**: 需要重新分析根本原因，current solution plan 可能未觸及核心問題。
+
+---
+
+## 🔴 根本原因分析 V2 (2025-12-16 深度分析)
+
+> 詳細分析報告：[2025-12-16_root_cause_analysis.md](2025-12-16_root_cause_analysis.md)
+
+### 發現的核心缺陷
+
+| # | 問題 | 嚴重程度 | 說明 |
+|---|------|----------|------|
+| 1 | `scrapeWithPuppeteer` 忽略 `categories` 配置 | 🔴 Critical | 函數完全不使用 `storeConfig.categories` |
+| 2 | `mergeProducts` 資料斷層 | 🔴 Critical | `productType`/`breadcrumb` 未傳遞給 `inferCategory` |
+| 3 | 過濾邏輯保留 `uncategorized` | 🟡 Medium | 未分類商品通過過濾進入結果 |
+
+### 為什麼之前的修復無效？
+
+之前新增的功能都沒有被正確使用：
+- `SHOPIFY_TYPE_MAPPING` - 但 `productType` 沒有傳遞到 `inferCategory`
+- `CATEGORY_NAV_KEYWORDS` 自動導航 - 但完全忽略已配置的分類 URL
+- 麵包屑機制 - 但 `breadcrumb` 同樣沒有傳遞
+
+**資料流程存在斷層，新功能形同虛設。**
+
+---
+
+## 🛠️ 修正方案 V2 (2025-12-16)
+
+### 修復 1: `scrapeWithPuppeteer` 使用分類配置 (Critical)
+
+**檔案**: `scraper.js` Line 495-560
+
+**修改內容**:
+```javascript
+// Line 496: 解構 categories
+async function scrapeWithPuppeteer(storeConfig) {
+  const { id, name, baseUrl, currency = 'JPY', categories = [] } = storeConfig;
+
+  // Line 554-559: 優先使用配置的分類 URL
+  let pagesToScrape = [];
+
+  // 如果有配置分類，優先使用
+  if (categories && categories.length > 0) {
+    pagesToScrape = categories
+      .filter(c => c.enabled !== false)
+      .map(c => c.url);
+    console.log(`  📋 使用配置的 ${pagesToScrape.length} 個分類 URL:`);
+    pagesToScrape.forEach((url, i) => console.log(`     ${i + 1}. ${url}`));
+  } else if (categoryUrls.length > 0) {
+    // 沒有配置時，才使用自動導航
+    pagesToScrape = categoryUrls;
+    console.log(`  🔍 自動發現 ${categoryUrls.length} 個分類頁面`);
+  } else {
+    pagesToScrape = [baseUrl];
+  }
+```
+
+---
+
+### 修復 2: `mergeProducts` 保留並傳遞分類資訊 (Critical)
+
+**檔案**: `scraper.js` Line 2541-2620
+
+**修改 A**: Line 2570-2582 保留 `productType` 和 `breadcrumb`
+```javascript
+merged.stores.push({
+  store: product.store,
+  storeName: product.storeName,
+  currency: product.currency,
+  originalPrice: product.originalPrice,
+  salePrice: product.salePrice,
+  priceJPY: product.priceJPY,
+  discount: product.discount,
+  productUrl: product.productUrl,
+  scrapedAt: product.scrapedAt,
+  categoryId: product.categoryId,
+  categoryName: product.categoryName,
+  productType: product.productType || '',  // ✅ 新增
+  breadcrumb: product.breadcrumb || ''     // ✅ 新增
+});
+```
+
+**修改 B**: Line 2598-2610 傳遞給 `inferCategory`
+```javascript
+if (product.categories.length === 0) {
+  const firstStore = product.stores[0];
+  const inferredCategory = inferCategory({
+    brand: product.brand,
+    name: product.name,
+    productUrl: firstStore?.productUrl,
+    key: product.key,
+    productType: firstStore?.productType || '',  // ✅ 新增
+    breadcrumb: firstStore?.breadcrumb || ''     // ✅ 新增
+  });
+  // ...
+}
+```
+
+---
+
+### 修復 3: 調整過濾邏輯 (Medium - 可選)
+
+**檔案**: `scraper.js` Line 3773-3781
+
+**選項 A**: 不保留 uncategorized (嚴格模式)
+```javascript
+const filteredProducts = mergedProducts.filter(product => {
+  if (!product.categories || product.categories.length === 0) {
+    return false; // 不保留無分類商品
+  }
+  return product.categories.some(cat => enabledCategories.has(cat));
+});
+```
+
+**選項 B**: 保留現狀 + 前端增加開關
+
+---
+
+## 📋 修改檔案清單
+
+| 檔案 | 行數 | 修改內容 |
+|------|------|----------|
+| `scraper.js` | 496 | 解構 `categories` 參數 |
+| `scraper.js` | 554-559 | 優先使用配置的分類 URL |
+| `scraper.js` | 2570-2582 | 保留 `productType`/`breadcrumb` |
+| `scraper.js` | 2598-2610 | 傳遞給 `inferCategory` |
+| `scraper.js` | 3773-3781 | (可選) 調整過濾邏輯 |
+
+---
+
+## 📊 驗證標準
+
+| 店家 | 目標商品數 | 目標 uncategorized |
+|------|------------|-------------------|
+| Sportsbomber | 50+ | < 5 |
+| North Shore | 100+ | < 10 |
+| Comorsports | 50+ | < 5 |
+| Switchsnow | 200+ | < 10 |
+
+---
+
+## ⚠️ 風險評估
+
+- **修復 1**: 低風險 - 只改變頁面選擇邏輯
+- **修復 2**: 低風險 - 只增加資料傳遞
+- **修復 3**: 中風險 - 可能隱藏部分商品，建議先觀察
