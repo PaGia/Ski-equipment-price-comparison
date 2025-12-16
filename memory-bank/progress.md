@@ -55,6 +55,43 @@
 
 **狀態：** 已完成
 
+### 分類系統升級 - Shopify 爬蟲修復與自動導航
+
+**問題修復：**
+根據 `development-reports/debug/2025-12-16_post_update_issues.md` 中識別的問題進行修復：
+
+1. **North Shore 固定器消失** - `scrapeShopifyJsonApi` 中的 `skipKeywords` 誤過濾了商品
+2. **Comorsports/Switchsnow 過濾失效** - 商品被判定為 `uncategorized` 而通過過濾
+3. **Sportsbomber 只有一件商品** - Puppeteer 爬蟲只抓首頁，未進入分類頁面
+
+**實作內容：**
+
+1. **新增 `SHOPIFY_TYPE_MAPPING` 常數** (`scraper.js`)
+   - Shopify `product_type` 到分類 ID 的映射表
+   - 支援 "Snowboards", "Bindings", "Boots", "Helmets" 等類型
+
+2. **修復 `scrapeShopifyJsonApi()` 函數**
+   - 移除 `skipKeywords` 硬編碼過濾（改由統一分類系統處理）
+   - 新增 `productType` 欄位（獨立於 `breadcrumb`）
+   - 保持 `breadcrumb` 欄位為空，避免概念混淆
+
+3. **修改 `inferCategory()` 優先級**
+   - 新增 Shopify `productType` 判斷（次高優先級）
+   - 優先級順序：手動分類 > productType > 麵包屑 > URL > 關鍵字
+
+4. **實作 Puppeteer 自動導航功能**
+   - 新增 `CATEGORY_NAV_KEYWORDS` 常數（分類關鍵字列表）
+   - 爬蟲自動掃描首頁導航選單，發現分類頁面連結
+   - 自動遍歷所有分類頁面進行抓取
+   - 商品去重機制（避免重複抓取）
+
+**預期效果：**
+- North Shore 的 Binding (固定器) 將重新出現
+- 各店家商品分類更準確
+- Sportsbomber 等 BASE 店家商品數量大幅增加
+
+**狀態：** 已完成
+
 ---
 
 ## 2025-12-15

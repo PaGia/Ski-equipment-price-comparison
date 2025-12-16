@@ -29,11 +29,12 @@
 - [x] 規則學習（從手動分類學習新關鍵字）
 - [x] 分類過濾（只抓取啟用分類的商品）
 
-### Phase 3.6: 分類精確度優化 (終極版) 🚀 (進行中)
-- [ ] **基礎架構升級**: 修改 `inferCategoryFromName` 支援麵包屑與 URL 優先判斷
-- [ ] **爬蟲邏輯更新**: 修改 `scraper.js` 抓取頁面麵包屑文字
-- [ ] **設定檔擴充**: `custom-stores.json` 支援 `breadcrumbSelector`
-- [ ] **驗證測試**: 確保代號型 URL 網站分類準確度達 100%
+### Phase 3.6: 分類精確度優化 (終極版) ✅ (2025-12-16)
+- [x] **基礎架構升級**: 修改 `inferCategoryFromName` 支援麵包屑與 URL 優先判斷
+- [x] **爬蟲邏輯更新**: 修改 `scraper.js` 抓取頁面麵包屑文字
+- [x] **Shopify 爬蟲修復**: 移除 `skipKeywords`，新增 `productType` 欄位
+- [x] **自動導航功能**: Puppeteer 爬蟲自動發現並遍歷分類頁面
+- [x] **分類優先級更新**: 手動 > productType > 麵包屑 > URL > 關鍵字
 
 ## 待開發功能
 

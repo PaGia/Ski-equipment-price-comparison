@@ -105,6 +105,47 @@ const BREADCRUMB_CATEGORY_MAP = {
   snowboard: ['snowboard', 'snowboards', 'スノーボード', 'boards']
 };
 
+// Shopify product_type 到分類的映射 (用於 Shopify JSON API)
+const SHOPIFY_TYPE_MAPPING = {
+  // 雪板相關
+  'Snowboards': 'snowboard',
+  'Snowboard': 'snowboard',
+  'Board': 'snowboard',
+  'Boards': 'snowboard',
+  // 固定器相關
+  'Snowboard Bindings': 'binding',
+  'Bindings': 'binding',
+  'Binding': 'binding',
+  // 雪靴相關
+  'Snowboard Boots': 'boots',
+  'Boots': 'boots',
+  'Boot': 'boots',
+  // 安全帽
+  'Helmets': 'helmet',
+  'Helmet': 'helmet',
+  // 護目鏡
+  'Goggles': 'goggle',
+  'Goggle': 'goggle',
+  // 手套
+  'Gloves': 'glove',
+  'Glove': 'glove',
+  'Mitts': 'glove',
+  // 服裝
+  'Jackets': 'wear',
+  'Jacket': 'wear',
+  'Pants': 'wear',
+  'Pant': 'wear',
+  'Clothing': 'wear',
+  'Outerwear': 'wear',
+  // 背包
+  'Bags': 'bag',
+  'Bag': 'bag',
+  'Cases': 'bag',
+  // 配件
+  'Accessories': 'accessory',
+  'Accessory': 'accessory'
+};
+
 // 載入分類設定
 function loadCategorySettings() {
   try {
@@ -198,7 +239,7 @@ function inferCategoryFromName(brand, name, url = '', breadcrumbText = '') {
 
 // 綜合分類推斷
 function inferCategory(product) {
-  const { brand, name, productUrl, key, breadcrumb } = product;
+  const { brand, name, productUrl, key, breadcrumb, productType } = product;
 
   // 1. 檢查手動分類 (最高優先)
   const manualData = loadManualClassifications();
@@ -206,11 +247,16 @@ function inferCategory(product) {
     return manualData.classifications[key];
   }
 
-  // 2. 使用整合的分類函數 (麵包屑 > URL > 關鍵字)
+  // 2. 檢查 Shopify productType (次高優先 - 100% 準確)
+  if (productType && SHOPIFY_TYPE_MAPPING[productType]) {
+    return SHOPIFY_TYPE_MAPPING[productType];
+  }
+
+  // 3. 使用整合的分類函數 (麵包屑 > URL > 關鍵字)
   const inferredCategory = inferCategoryFromName(brand, name, productUrl, breadcrumb);
   if (inferredCategory) return inferredCategory;
 
-  // 3. 無法辨識
+  // 4. 無法辨識
   return 'uncategorized';
 }
 
@@ -434,6 +480,17 @@ const BRAND_PATTERNS = [
   'GRAY', 'MOSS', 'SCOOTER', 'FANATIC', 'RICE28', 'GENTEMSTICK', 'TJ BRAND'
 ];
 
+// 自動導航關鍵字 (用於發現分類頁面連結)
+const CATEGORY_NAV_KEYWORDS = [
+  // 英文
+  'snowboard', 'binding', 'bindings', 'boots', 'boot',
+  'helmet', 'goggle', 'goggles', 'glove', 'gloves',
+  'jacket', 'pants', 'outerwear', 'accessories',
+  // 日文
+  'スノーボード', 'バインディング', 'ビンディング', 'ブーツ',
+  'ヘルメット', 'ゴーグル', 'グローブ', 'ウェア', 'ジャケット', 'パンツ'
+];
+
 // ============ Puppeteer 爬蟲 (JavaScript 渲染網站) ============
 async function scrapeWithPuppeteer(storeConfig) {
   const { id, name, baseUrl, currency = 'JPY' } = storeConfig;
@@ -457,6 +514,58 @@ async function scrapeWithPuppeteer(storeConfig) {
 
     // 等待商品載入
     await delay(3000);
+
+    // === 自動導航：發現分類頁面連結 ===
+    const categoryUrls = await page.evaluate((keywords) => {
+      const links = Array.from(document.querySelectorAll('a[href]'));
+      const found = new Set();
+      const origin = window.location.origin;
+
+      for (const link of links) {
+        const href = link.getAttribute('href') || '';
+        const text = link.textContent?.toLowerCase() || '';
+        const hrefLower = href.toLowerCase();
+
+        // 排除外部連結、錨點、JavaScript 連結
+        if (href.startsWith('javascript:') || href.startsWith('#') || href.startsWith('mailto:')) continue;
+
+        // 檢查連結文字或 URL 是否包含分類關鍵字
+        const hasKeyword = keywords.some(kw => {
+          const kwLower = kw.toLowerCase();
+          return text.includes(kwLower) || hrefLower.includes(kwLower);
+        });
+
+        if (hasKeyword) {
+          let fullUrl = href;
+          if (href.startsWith('/')) {
+            fullUrl = origin + href;
+          } else if (!href.startsWith('http')) {
+            fullUrl = origin + '/' + href;
+          }
+          // 排除商品詳細頁面連結
+          if (!fullUrl.includes('/items/') && !fullUrl.includes('/products/') && !fullUrl.includes('/product/')) {
+            found.add(fullUrl);
+          }
+        }
+      }
+      return Array.from(found);
+    }, CATEGORY_NAV_KEYWORDS);
+
+    // 如果找到分類連結，遍歷每個分類頁面抓取
+    const pagesToScrape = categoryUrls.length > 0 ? categoryUrls : [baseUrl];
+    if (categoryUrls.length > 0) {
+      console.log(`  🔍 發現 ${categoryUrls.length} 個分類頁面，將逐一抓取...`);
+      categoryUrls.forEach((url, i) => console.log(`     ${i + 1}. ${url}`));
+    }
+
+    const seenProductUrls = new Set();
+
+    for (const pageUrl of pagesToScrape) {
+      if (pageUrl !== baseUrl) {
+        console.log(`\n  📂 進入分類頁面: ${pageUrl}`);
+        await page.goto(pageUrl, { waitUntil: 'networkidle2', timeout: 60000 });
+        await delay(2000);
+      }
 
     // 嘗試點擊「Load More」按鈕載入所有商品
     // 注意：避免使用 a:has-text("MORE") 等選擇器，因為可能誤匹配商品名稱中的文字
@@ -876,8 +985,17 @@ async function scrapeWithPuppeteer(storeConfig) {
     if (skippedCount > 0) {
       console.log(`  ⚠️ 跳過 ${skippedCount} 個異常價格商品`);
     }
-    products.push(...validProducts);
-    console.log(`  找到 ${validProducts.length} 個商品`);
+
+    // 過濾重複商品
+    for (const p of validProducts) {
+      if (!seenProductUrls.has(p.productUrl)) {
+        seenProductUrls.add(p.productUrl);
+        products.push(p);
+      }
+    }
+    console.log(`  找到 ${validProducts.length} 個商品 (去重後累計: ${products.length})`);
+
+    } // 結束 for (const pageUrl of pagesToScrape) 迴圈
 
   } catch (error) {
     console.error(`  Puppeteer 抓取失敗:`, error.message);
@@ -1469,15 +1587,8 @@ async function scrapeShopifyJsonApi(storeConfig) {
             if (imageUrl.startsWith('//')) imageUrl = 'https:' + imageUrl;
           }
 
-          // 跳過真正的小配件（保留 binding 和 boots 讓前端篩選）
-          const skipKeywords = [
-            'puck', 'screw', 'stomp', 'leash', 'lock', 'wax', 'tool', 'bag only', 'strap',
-            'helmet', 'goggle', 'glove', 'jacket', 'pants', 'sock', 'beanie', 'cap', 'hat'
-          ];
-          const lowerTitle = (product.title || '').toLowerCase();
-          const isAccessory = skipKeywords.some(kw => lowerTitle.includes(kw));
-
-          if (!isAccessory && productName && productUrl) {
+          // 不再使用 skipKeywords 過濾，改由統一的分類系統處理
+          if (productName && productUrl) {
             const rate = EXCHANGE_RATES[currency] || 1;
             const priceJPY = salePrice ? Math.round(salePrice * rate) : null;
 
@@ -1504,7 +1615,8 @@ async function scrapeShopifyJsonApi(storeConfig) {
               discount,
               imageUrl,
               productUrl,
-              breadcrumb: product.product_type || '',
+              productType: product.product_type || '',
+              breadcrumb: '',
               scrapedAt: new Date().toISOString()
             });
             newProductCount++;
