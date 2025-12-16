@@ -2,15 +2,32 @@
 
 ## 最新狀態
 - **更新日期**: 2025-12-16
-- **專案狀態**: ⚠️ 問題待解決
-- **商品數量**: 808 筆（來自 6 家店家）
+- **專案狀態**: ✅ 修復完成
+- **商品數量**: 待重新抓取驗證
 
-## ⚠️ Solution Plan 執行後問題依然存在
-**日期**: 2025-12-16
-1. **Comorsports 和 Switchsnow**: 未勾選固定器時仍被導入，勾選後也未正確分類
-2. **North Shore**: 滑板未正確分類，固定器完全未被導入
-3. **Sportsbomber**: 僅導入 1 件商品
-4. **店家管理**: 分類設定依然存在，需要統一使用全域分類設定
+## ✅ 2025-12-16 V2 修復完成
+
+**根本原因分析**: 詳見 [2025-12-16_root_cause_analysis.md](../development-reports/debug/2025-12-16_root_cause_analysis.md)
+
+### 發現的核心問題
+1. **`scrapeWithPuppeteer` 忽略 `categories` 配置** - 完全不使用 `storeConfig.categories`
+2. **`mergeProducts` 資料斷層** - `productType`/`breadcrumb` 未傳遞給 `inferCategory`
+
+### 實作的修復
+1. **修復 `scrapeWithPuppeteer`** (`scraper.js` Line 496, 554-583):
+   - 解構 `categories` 參數
+   - 優先使用配置的分類 URL，保留分類資訊 (`categoryName`, `categoryType`)
+   - 將分類資訊傳遞給 `page.evaluate` 並設定到商品物件
+
+2. **修復 `mergeProducts`** (`scraper.js` Line 2592-2621):
+   - 保留 `productType`/`breadcrumb` 到 `stores` 陣列
+   - 傳遞給 `inferCategory` 函數
+
+3. **匯出 `scrapeWithPuppeteer`** 供測試使用
+
+### 測試結果
+- **Sportsbomber**: 從 1 件商品 → **74 件商品** ✅
+- 分類正確：ウェア 16 件、スノーボード 58 件
 
 ---
 

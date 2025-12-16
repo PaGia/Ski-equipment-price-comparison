@@ -493,7 +493,7 @@ const CATEGORY_NAV_KEYWORDS = [
 
 // ============ Puppeteer 爬蟲 (JavaScript 渲染網站) ============
 async function scrapeWithPuppeteer(storeConfig) {
-  const { id, name, baseUrl, currency = 'JPY' } = storeConfig;
+  const { id, name, baseUrl, currency = 'JPY', categories = [] } = storeConfig;
   console.log(`\n使用 Puppeteer 抓取 ${name}...`);
 
   const products = [];
@@ -551,16 +551,36 @@ async function scrapeWithPuppeteer(storeConfig) {
       return Array.from(found);
     }, CATEGORY_NAV_KEYWORDS);
 
-    // 如果找到分類連結，遍歷每個分類頁面抓取
-    const pagesToScrape = categoryUrls.length > 0 ? categoryUrls : [baseUrl];
-    if (categoryUrls.length > 0) {
-      console.log(`  🔍 發現 ${categoryUrls.length} 個分類頁面，將逐一抓取...`);
+    // 決定要抓取的頁面：優先使用配置的分類 URL
+    // 結構: { url: string, categoryName: string, categoryType: string }
+    let pagesToScrape = [];
+
+    if (categories && categories.length > 0) {
+      // 優先使用配置的分類 URL，並保留分類資訊
+      pagesToScrape = categories
+        .filter(c => c.enabled !== false)
+        .map(c => ({
+          url: c.url,
+          categoryName: c.name || c.originalName || '',
+          categoryType: c.type || ''
+        }));
+      console.log(`  📋 使用配置的 ${pagesToScrape.length} 個分類 URL:`);
+      pagesToScrape.forEach((p, i) => console.log(`     ${i + 1}. ${p.url} (${p.categoryName})`));
+    } else if (categoryUrls.length > 0) {
+      // 沒有配置時，才使用自動導航發現的分類
+      pagesToScrape = categoryUrls.map(url => ({ url, categoryName: '', categoryType: '' }));
+      console.log(`  🔍 自動發現 ${categoryUrls.length} 個分類頁面，將逐一抓取...`);
       categoryUrls.forEach((url, i) => console.log(`     ${i + 1}. ${url}`));
+    } else {
+      pagesToScrape = [{ url: baseUrl, categoryName: '', categoryType: '' }];
     }
 
     const seenProductUrls = new Set();
 
-    for (const pageUrl of pagesToScrape) {
+    for (const pageInfo of pagesToScrape) {
+      const pageUrl = pageInfo.url;
+      const pageCategoryName = pageInfo.categoryName;
+      const pageCategoryType = pageInfo.categoryType;
       if (pageUrl !== baseUrl) {
         console.log(`\n  📂 進入分類頁面: ${pageUrl}`);
         await page.goto(pageUrl, { waitUntil: 'networkidle2', timeout: 60000 });
@@ -736,9 +756,9 @@ async function scrapeWithPuppeteer(storeConfig) {
     const urlObj = new URL(baseUrl);
     const origin = urlObj.origin;
 
-    // 提取商品資料 (含麵包屑)
+    // 提取商品資料 (含麵包屑和分類資訊)
     const pageProducts = await page.evaluate((params) => {
-      const { id, name, currency, origin, BRAND_PATTERNS, breadcrumbSelectors } = params;
+      const { id, name, currency, origin, BRAND_PATTERNS, breadcrumbSelectors, categoryName, categoryType } = params;
       const results = [];
       const seenUrls = new Set();
 
@@ -956,6 +976,8 @@ async function scrapeWithPuppeteer(storeConfig) {
               imageUrl,
               productUrl,
               breadcrumb: pageBreadcrumb,
+              categoryName: categoryName || '',
+              categoryType: categoryType || '',
               scrapedAt: new Date().toISOString()
             });
           }
@@ -965,7 +987,7 @@ async function scrapeWithPuppeteer(storeConfig) {
       });
 
       return results;
-    }, { id, name, currency, origin, BRAND_PATTERNS, breadcrumbSelectors: BREADCRUMB_SELECTORS });
+    }, { id, name, currency, origin, BRAND_PATTERNS, breadcrumbSelectors: BREADCRUMB_SELECTORS, categoryName: pageCategoryName, categoryType: pageCategoryType });
 
     // 計算 JPY 價格並過濾異常值
     let skippedCount = 0;
@@ -2578,7 +2600,9 @@ function mergeProducts(allStoreProducts) {
       productUrl: product.productUrl,
       scrapedAt: product.scrapedAt,
       categoryId: product.categoryId,
-      categoryName: product.categoryName
+      categoryName: product.categoryName,
+      productType: product.productType || '',
+      breadcrumb: product.breadcrumb || ''
     });
   }
 
@@ -2597,11 +2621,14 @@ function mergeProducts(allStoreProducts) {
 
     // 如果沒有分類，嘗試推斷
     if (product.categories.length === 0) {
+      const firstStore = product.stores[0];
       const inferredCategory = inferCategory({
         brand: product.brand,
         name: product.name,
-        productUrl: product.stores[0]?.productUrl,
-        key: product.key
+        productUrl: firstStore?.productUrl,
+        key: product.key,
+        productType: firstStore?.productType || '',
+        breadcrumb: firstStore?.breadcrumb || ''
       });
       if (inferredCategory && inferredCategory !== 'uncategorized') {
         product.categories.push(inferredCategory);
@@ -3834,6 +3861,7 @@ if (require.main === module) {
 
 module.exports = {
   scrapeAll,
+  scrapeWithPuppeteer,
   addCustomStore,
   addCustomStoreWithCategories,
   exploreStoreCategories,

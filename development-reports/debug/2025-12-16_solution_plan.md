@@ -251,3 +251,34 @@ const filteredProducts = mergedProducts.filter(product => {
 - **修復 1**: 低風險 - 只改變頁面選擇邏輯
 - **修復 2**: 低風險 - 只增加資料傳遞
 - **修復 3**: 中風險 - 可能隱藏部分商品，建議先觀察
+
+---
+
+## ✅ 執行結果 V2 (2025-12-16)
+
+**狀態**: ✅ **已修復** - 核心問題已解決
+
+### 實作的修改:
+
+1. **修復 `scrapeWithPuppeteer`** (`scraper.js`):
+   - Line 496: 解構 `categories` 參數
+   - Line 554-583: 優先使用配置的分類 URL，保留分類資訊
+   - Line 761, 979-980, 990: 傳遞並設定 `categoryName`/`categoryType` 到商品物件
+
+2. **修復 `mergeProducts`** (`scraper.js`):
+   - Line 2604-2605: 保留 `productType`/`breadcrumb` 到 `stores` 陣列
+   - Line 2620-2621: 傳遞給 `inferCategory` 函數
+
+3. **新增匯出**: `scrapeWithPuppeteer` (Line 3854)
+
+### 測試結果:
+
+| 店家 | 修復前 | 修復後 | 狀態 |
+|------|--------|--------|------|
+| Sportsbomber | 1 件 | 74 件 | ✅ |
+
+分類分布驗證：
+- ウェア: 16 件 → 標準化為 `wear`
+- スノーボード: 58 件 → 標準化為 `snowboard`
+
+**結論**: 修復成功，商品數量大幅增加，分類正確傳遞。
