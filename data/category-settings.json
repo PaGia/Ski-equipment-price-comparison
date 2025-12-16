@@ -1,0 +1,59 @@
+{
+  "enabledCategories": [
+    "snowboard",
+    "helmet"
+  ],
+  "availableCategories": [
+    {
+      "id": "snowboard",
+      "name": "雪板",
+      "nameJP": "スノーボード"
+    },
+    {
+      "id": "binding",
+      "name": "固定器",
+      "nameJP": "バインディング"
+    },
+    {
+      "id": "boots",
+      "name": "雪靴",
+      "nameJP": "ブーツ"
+    },
+    {
+      "id": "helmet",
+      "name": "安全帽",
+      "nameJP": "ヘルメット"
+    },
+    {
+      "id": "goggle",
+      "name": "護目鏡",
+      "nameJP": "ゴーグル"
+    },
+    {
+      "id": "glove",
+      "name": "手套",
+      "nameJP": "グローブ"
+    },
+    {
+      "id": "wear",
+      "name": "服裝",
+      "nameJP": "ウェア"
+    },
+    {
+      "id": "protector",
+      "name": "護具",
+      "nameJP": "プロテクター"
+    },
+    {
+      "id": "bag",
+      "name": "背包",
+      "nameJP": "バッグ"
+    },
+    {
+      "id": "accessory",
+      "name": "配件",
+      "nameJP": "アクセサリー"
+    }
+  ],
+  "updatedAt": "2025-12-15T06:03:12.238Z"
+}
