@@ -9,62 +9,36 @@ const CUSTOM_STORES_FILE = path.join(__dirname, 'data', 'custom-stores.json');
 const CATEGORY_SETTINGS_FILE = path.join(__dirname, 'data', 'category-settings.json');
 const MANUAL_CLASSIFICATIONS_FILE = path.join(__dirname, 'data', 'manual-classifications.json');
 
-// ============ 分類關鍵字對照表 ============
+// ============ 允許的分類 (2025-12-16 簡化) ============
+// 只保留四種核心分類，其他商品一律不匯入
+const ALLOWED_CATEGORIES = ['snowboard', 'ski', 'binding', 'boots'];
+
+// ============ 分類關鍵字對照表 (簡化版) ============
 const CATEGORY_KEYWORDS = {
   snowboard: {
-    keywords: ['snowboard', 'スノーボード', 'スノボ', 'board'],
+    keywords: ['snowboard', 'スノーボード', 'スノボ', 'board', '単板', '單板'],
     excludeKeywords: ['ski', 'スキー', 'binding', 'boot', 'bag', 'case', 'ケース', 'バッグ']
   },
+  ski: {
+    keywords: ['ski', 'skis', 'スキー', '雙板', '双板'],
+    excludeKeywords: ['binding', 'boot', 'bag', 'case']
+  },
   binding: {
-    keywords: ['binding', 'bindings', 'バインディング', 'ビンディング'],
+    keywords: ['binding', 'bindings', 'バインディング', 'ビンディング', '固定器'],
     excludeKeywords: []
   },
   boots: {
-    keywords: ['boot', 'boots', 'ブーツ'],
+    keywords: ['boot', 'boots', 'ブーツ', '雪靴'],
     excludeKeywords: ['bag', 'case', 'ケース', 'バッグ']
-  },
-  helmet: {
-    keywords: ['helmet', 'ヘルメット'],
-    excludeKeywords: []
-  },
-  goggle: {
-    keywords: ['goggle', 'goggles', 'ゴーグル'],
-    excludeKeywords: ['strap', 'case', 'ケース', 'bag']
-  },
-  glove: {
-    keywords: ['glove', 'gloves', 'グローブ', 'mitt', 'mitten', 'ミトン'],
-    excludeKeywords: []
-  },
-  wear: {
-    keywords: ['jacket', 'pants', 'pant', 'ジャケット', 'パンツ', 'ウェア', 'wear', 'outerwear'],
-    excludeKeywords: []
-  },
-  protector: {
-    keywords: ['protector', 'protection', 'プロテクター', 'pad', 'パッド', 'guard', 'impact'],
-    excludeKeywords: []
-  },
-  bag: {
-    keywords: ['bag', 'バッグ', 'ケース', 'pack', 'backpack'],
-    excludeKeywords: []
-  },
-  accessory: {
-    keywords: ['stomp', 'leash', 'lock', 'tool', 'wax', 'ワックス', 'デッキパッド', 'tuning'],
-    excludeKeywords: []
   }
 };
 
-// URL 路徑分析模式
+// URL 路徑分析模式 (簡化版 - 只保留四大分類)
 const URL_CATEGORY_PATTERNS = {
-  snowboard: ['/snowboard', '/boards', 'cat=017', '/スノーボード'],
-  binding: ['/binding', '/bindings', '/バインディング'],
-  boots: ['/boot', '/boots', '/ブーツ'],
-  helmet: ['/helmet', '/ヘルメット'],
-  goggle: ['/goggle', '/ゴーグル'],
-  glove: ['/glove', '/グローブ'],
-  wear: ['/jacket', '/pants', '/wear', '/ウェア', '/ジャケット', '/パンツ'],
-  protector: ['/protector', '/protection', '/プロテクター'],
-  bag: ['/bag', '/case', '/バッグ'],
-  accessory: ['/accessor', '/アクセサリー']
+  snowboard: ['/snowboard', '/boards', 'cat=017', '/スノーボード', '/単板'],
+  ski: ['/ski', '/skis', '/スキー', '/双板'],
+  binding: ['/binding', '/bindings', '/バインディング', '/ビンディング'],
+  boots: ['/boot', '/boots', '/ブーツ']
 };
 
 // 麵包屑選擇器列表 (用於精確分類)
@@ -81,69 +55,38 @@ const BREADCRUMB_SELECTORS = [
   '.navigation-path'
 ];
 
-// 麵包屑文字到分類的映射
+// 麵包屑文字到分類的映射 (簡化版 - 只保留四大分類)
 const BREADCRUMB_CATEGORY_MAP = {
   // 固定器 (最高優先)
-  binding: ['binding', 'bindings', 'バインディング', 'ビンディング'],
+  binding: ['binding', 'bindings', 'バインディング', 'ビンディング', '固定器'],
   // 雪靴
-  boots: ['boot', 'boots', 'ブーツ', 'スノーボードブーツ'],
-  // 安全帽
-  helmet: ['helmet', 'helmets', 'ヘルメット'],
-  // 護目鏡
-  goggle: ['goggle', 'goggles', 'ゴーグル'],
-  // 手套
-  glove: ['glove', 'gloves', 'グローブ', 'ミトン'],
-  // 服裝
-  wear: ['wear', 'apparel', 'jacket', 'pants', 'ウェア', 'ジャケット', 'パンツ', 'アウター'],
-  // 護具
-  protector: ['protector', 'protection', 'プロテクター', 'パッド'],
-  // 背包
-  bag: ['bag', 'bags', 'case', 'バッグ', 'ケース'],
-  // 配件
-  accessory: ['accessory', 'accessories', 'アクセサリー', '小物'],
+  boots: ['boot', 'boots', 'ブーツ', 'スノーボードブーツ', '雪靴'],
+  // 雙板
+  ski: ['ski', 'skis', 'スキー', '雙板', '双板'],
   // 雪板 (最低優先，避免誤判)
-  snowboard: ['snowboard', 'snowboards', 'スノーボード', 'boards']
+  snowboard: ['snowboard', 'snowboards', 'スノーボード', 'boards', '単板', '單板']
 };
 
-// Shopify product_type 到分類的映射 (用於 Shopify JSON API)
+// Shopify product_type 到分類的映射 (簡化版 - 只保留四大分類)
 const SHOPIFY_TYPE_MAPPING = {
-  // 雪板相關
+  // 雪板
   'Snowboards': 'snowboard',
   'Snowboard': 'snowboard',
   'Board': 'snowboard',
   'Boards': 'snowboard',
-  // 固定器相關
+  // 雙板
+  'Skis': 'ski',
+  'Ski': 'ski',
+  // 固定器
   'Snowboard Bindings': 'binding',
   'Bindings': 'binding',
   'Binding': 'binding',
-  // 雪靴相關
+  'Ski Bindings': 'binding',
+  // 雪靴
   'Snowboard Boots': 'boots',
   'Boots': 'boots',
   'Boot': 'boots',
-  // 安全帽
-  'Helmets': 'helmet',
-  'Helmet': 'helmet',
-  // 護目鏡
-  'Goggles': 'goggle',
-  'Goggle': 'goggle',
-  // 手套
-  'Gloves': 'glove',
-  'Glove': 'glove',
-  'Mitts': 'glove',
-  // 服裝
-  'Jackets': 'wear',
-  'Jacket': 'wear',
-  'Pants': 'wear',
-  'Pant': 'wear',
-  'Clothing': 'wear',
-  'Outerwear': 'wear',
-  // 背包
-  'Bags': 'bag',
-  'Bag': 'bag',
-  'Cases': 'bag',
-  // 配件
-  'Accessories': 'accessory',
-  'Accessory': 'accessory'
+  'Ski Boots': 'boots'
 };
 
 // 載入分類設定
@@ -480,15 +423,18 @@ const BRAND_PATTERNS = [
   'GRAY', 'MOSS', 'SCOOTER', 'FANATIC', 'RICE28', 'GENTEMSTICK', 'TJ BRAND'
 ];
 
-// 自動導航關鍵字 (用於發現分類頁面連結)
+// 自動導航關鍵字 (簡化版 - 只保留四大分類)
 const CATEGORY_NAV_KEYWORDS = [
   // 英文
-  'snowboard', 'binding', 'bindings', 'boots', 'boot',
-  'helmet', 'goggle', 'goggles', 'glove', 'gloves',
-  'jacket', 'pants', 'outerwear', 'accessories',
+  'snowboard', 'snowboards', 'board', 'boards',
+  'ski', 'skis',
+  'binding', 'bindings',
+  'boots', 'boot',
   // 日文
-  'スノーボード', 'バインディング', 'ビンディング', 'ブーツ',
-  'ヘルメット', 'ゴーグル', 'グローブ', 'ウェア', 'ジャケット', 'パンツ'
+  'スノーボード', '単板',
+  'スキー', '双板',
+  'バインディング', 'ビンディング',
+  'ブーツ'
 ];
 
 // ============ Puppeteer 爬蟲 (JavaScript 渲染網站) ============
@@ -3793,26 +3739,20 @@ async function scrapeAll(options = {}) {
   // 整合商品
   const mergedProducts = mergeProducts(allProducts);
 
-  // 載入分類設定並過濾
-  const categorySettings = loadCategorySettings();
-  const enabledCategories = new Set(categorySettings.enabledCategories || []);
-
-  // 過濾：只保留啟用分類的商品（保留 uncategorized 以便手動分類）
+  // 2025-12-16: 只保留四大分類的商品，其他一律不匯入
   const filteredProducts = mergedProducts.filter(product => {
     if (!product.categories || product.categories.length === 0) {
-      return true; // 保留無分類商品
+      return false; // 不保留無分類商品
     }
-    // 如果商品有任一啟用的分類，或者是 uncategorized，則保留
-    return product.categories.some(cat =>
-      enabledCategories.has(cat) || cat === 'uncategorized'
-    );
+    // 只保留四大分類的商品 (snowboard, ski, binding, boots)
+    return product.categories.some(cat => ALLOWED_CATEGORIES.includes(cat));
   });
 
   console.log('\n========================================');
   console.log(`抓取完成！`);
   console.log(`  原始商品: ${allProducts.length} 個`);
   console.log(`  整合後: ${mergedProducts.length} 個獨特商品`);
-  console.log(`  過濾後: ${filteredProducts.length} 個（啟用分類: ${categorySettings.enabledCategories?.join(', ')}）`);
+  console.log(`  過濾後: ${filteredProducts.length} 個（僅保留: ${ALLOWED_CATEGORIES.join(', ')}）`);
   console.log('========================================');
 
   // 準備店家列表
@@ -3875,5 +3815,6 @@ module.exports = {
   normalizeCategoryName,
   DATA_FILE,
   BUILT_IN_STORES,
-  EXCHANGE_RATES
+  EXCHANGE_RATES,
+  ALLOWED_CATEGORIES
 };

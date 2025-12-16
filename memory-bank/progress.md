@@ -2,10 +2,10 @@
 
 ## 最新狀態
 - **更新日期**: 2025-12-16
-- **專案狀態**: 🔄 分類系統重構中
+- **專案狀態**: ✅ 分類系統簡化完成
 - **決策**: 簡化分類系統，僅保留四種核心分類
 
-## 🚨 2025-12-16 重大決策：分類系統簡化
+## ✅ 2025-12-16 分類系統簡化完成
 
 **問題**: 自動導航功能在某些店家（如 Snowboardmds）會搜索大量無關分頁，導致抓取時間過長。
 
@@ -21,6 +21,39 @@
 3. **移除動態分類功能**，前端固定顯示這四個選項
 
 **實作計畫**: 詳見 [2025-12-16_category_simplification_plan.md](../development-reports/planning/2025-12-16_category_simplification_plan.md)
+
+### 實作內容
+
+1. **定義 `ALLOWED_CATEGORIES` 常數** (`scraper.js` Line 14)
+   ```javascript
+   const ALLOWED_CATEGORIES = ['snowboard', 'ski', 'binding', 'boots'];
+   ```
+
+2. **簡化分類關鍵字表** (`scraper.js`)
+   - `CATEGORY_KEYWORDS` - 僅保留四類
+   - `URL_CATEGORY_PATTERNS` - 僅保留四類
+   - `BREADCRUMB_CATEGORY_MAP` - 僅保留四類
+   - `SHOPIFY_TYPE_MAPPING` - 僅保留四類
+   - `CATEGORY_NAV_KEYWORDS` - 僅保留四類關鍵字
+
+3. **修改過濾邏輯** (`scraper.js` Line ~3745)
+   - 移除 `categorySettings` 動態讀取
+   - 改用 `ALLOWED_CATEGORIES` 靜態過濾
+   - 不保留無分類商品
+
+4. **更新店家配置** (`data/custom-stores.json`)
+   - 移除非核心分類 URL（服裝、安全帽等）
+
+5. **簡化前端** (`public/index.html`)
+   - 移除「分類管理」按鈕
+   - 移除分類管理 Modal
+   - 固定顯示四個分類選項
+   - 移除「待分類」選項
+
+### 測試結果
+- 語法檢查通過
+- 分類推斷正確運作
+- 非核心商品（helmet, goggle 等）正確被過濾
 
 ---
 

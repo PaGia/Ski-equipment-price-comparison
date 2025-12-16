@@ -1129,9 +1129,6 @@
     <button class="btn btn-secondary" onclick="reclassifyProducts()">
       <span>🏷️</span> 重新分類
     </button>
-    <button class="btn btn-secondary" onclick="openCategorySettingsModal()">
-      <span>📁</span> 分類管理
-    </button>
     <div class="view-toggle">
       <button class="view-btn active" id="gridViewBtn" onclick="setViewMode('grid')" title="卡片檢視">
         ▦
@@ -1223,27 +1220,6 @@
         <div class="loading-spinner"></div>
         <p>載入商品資料中...</p>
       </div>
-    </div>
-  </div>
-
-  <!-- 分類管理 Modal -->
-  <div class="modal-overlay" id="categorySettingsModal">
-    <div class="modal">
-      <h2>📁 分類管理</h2>
-      <p style="color: #888; font-size: 0.9rem; margin-bottom: 15px;">
-        勾選要追蹤的商品分類。未勾選的分類在「更新全部資料」時將不會被抓取。
-      </p>
-
-      <div class="category-settings-list" id="categorySettingsList">
-        <!-- 動態填入分類列表 -->
-      </div>
-
-      <div class="modal-buttons" style="margin-top: 20px;">
-        <button type="button" class="btn btn-cancel" onclick="closeCategorySettingsModal()">取消</button>
-        <button type="button" class="btn btn-success" onclick="saveCategorySettings()">儲存設定</button>
-      </div>
-
-      <div id="categorySettingsResult" style="margin-top: 15px;"></div>
     </div>
   </div>
 
@@ -1565,19 +1541,16 @@
       'accessories': 'accessory'
     };
 
-    // 分類顯示名稱
+    // 分類顯示名稱 (2025-12-16 簡化為四類)
     const categoryDisplayNames = {
       'snowboard': '雪板',
+      'ski': '雙板',
       'binding': '固定器',
-      'boots': '雪靴',
-      'helmet': '安全帽',
-      'goggle': '護目鏡',
-      'glove': '手套',
-      'wear': '服裝',
-      'jacket': '外套',
-      'pants': '雪褲',
-      'accessory': '配件'
+      'boots': '雪靴'
     };
+
+    // 允許的分類 (固定四類)
+    const ALLOWED_CATEGORIES = ['snowboard', 'ski', 'binding', 'boots'];
 
     // 標準化分類名稱
     function normalizeCategory(categoryName) {
@@ -1586,78 +1559,34 @@
       return categoryMapping[lower] || categoryMapping[categoryName] || categoryName;
     }
 
-    // 更新分類篩選選單
+    // 更新分類篩選選單 (2025-12-16 簡化為固定四類)
     function updateCategoryFilter() {
       const categoryFilter = document.getElementById('categoryFilter');
       const currentValue = categoryFilter.value;
 
-      // 收集所有商品的分類
-      const allCategories = new Set();
-      allProducts.forEach(product => {
-        if (product.categories && product.categories.length > 0) {
-          product.categories.forEach(cat => {
-            const normalized = normalizeCategory(cat);
-            if (normalized) allCategories.add(normalized);
-          });
-        }
-      });
-
-      // 保留「全部裝備」選項
+      // 重建選單：全部 + 四個固定分類
       categoryFilter.innerHTML = '<option value="all">全部裝備</option>';
 
-      // 定義排序順序
-      const categoryOrder = ['snowboard', 'binding', 'boots', 'helmet', 'goggle', 'glove', 'wear', 'jacket', 'pants', 'accessory'];
-
-      // 按順序添加分類選項
-      categoryOrder.forEach(cat => {
-        if (allCategories.has(cat)) {
-          const option = document.createElement('option');
-          option.value = cat;
-          option.textContent = categoryDisplayNames[cat] || cat;
-          categoryFilter.appendChild(option);
-        }
-      });
-
-      // 添加其他未在預設順序中的分類
-      allCategories.forEach(cat => {
-        if (!categoryOrder.includes(cat) && cat !== 'uncategorized') {
-          const option = document.createElement('option');
-          option.value = cat;
-          option.textContent = categoryDisplayNames[cat] || cat;
-          categoryFilter.appendChild(option);
-        }
-      });
-
-      // 檢查是否有待分類商品，如果有則添加「待分類」選項
-      const hasUncategorized = allProducts.some(p =>
-        !p.categories || p.categories.length === 0 || p.categories.includes('uncategorized')
-      );
-      if (hasUncategorized) {
+      // 固定顯示四個分類選項
+      ALLOWED_CATEGORIES.forEach(cat => {
         const option = document.createElement('option');
-        option.value = 'uncategorized';
-        option.textContent = '⚠️ 待分類';
-        option.style.color = '#ff6b6b';
+        option.value = cat;
+        option.textContent = categoryDisplayNames[cat] || cat;
         categoryFilter.appendChild(option);
-      }
+      });
 
       // 如果之前選擇的值還存在，恢復選擇
-      if (currentValue && Array.from(categoryFilter.options).some(opt => opt.value === currentValue)) {
+      if (currentValue && ALLOWED_CATEGORIES.includes(currentValue)) {
         categoryFilter.value = currentValue;
-      } else if (allCategories.has('snowboard')) {
+      } else {
         // 預設選擇雪板
         categoryFilter.value = 'snowboard';
       }
     }
 
+    // 分類匹配 (2025-12-16 簡化)
     function matchCategory(product, category) {
       if (category === 'all') return true;
-
-      // 待分類篩選
-      if (category === 'uncategorized') {
-        return !product.categories ||
-               product.categories.length === 0 ||
-               product.categories.includes('uncategorized');
-      }
 
       // 如果商品有分類資訊，根據分類篩選
       if (product.categories && product.categories.length > 0) {
@@ -1667,24 +1596,19 @@
       // 如果沒有分類資訊，使用關鍵字匹配（向後相容舊資料）
       const name = ((product.brand || '') + ' ' + (product.name || '')).toLowerCase();
 
-      // 關鍵字匹配
+      // 關鍵字匹配 (僅四類)
       const keywords = {
-        snowboard: ['snowboard', 'ボード', 'スノーボード', '板'],
+        snowboard: ['snowboard', 'ボード', 'スノーボード', '板', '単板'],
+        ski: ['ski', 'skis', 'スキー', '双板'],
         binding: ['binding', 'bindings', 'バインディング', 'ビンディング'],
-        boots: ['boot', 'boots', 'ブーツ'],
-        helmet: ['helmet', 'ヘルメット'],
-        goggle: ['goggle', 'ゴーグル'],
-        glove: ['glove', 'グローブ'],
-        wear: ['wear', 'ウェア'],
-        jacket: ['jacket', 'ジャケット'],
-        pants: ['pant', 'pants', 'パンツ']
+        boots: ['boot', 'boots', 'ブーツ']
       };
 
       if (keywords[category]) {
         return keywords[category].some(kw => name.includes(kw));
       }
 
-      return true;
+      return false;
     }
 
     function filterProducts() {
@@ -2566,123 +2490,7 @@
       if (e.target.id === 'storeModal') {
         closeStoreModal();
       }
-      if (e.target.id === 'categorySettingsModal') {
-        closeCategorySettingsModal();
-      }
     });
-
-    // ============ 分類設定相關函數 ============
-
-    let categorySettings = null;
-
-    // 開啟分類設定 Modal
-    async function openCategorySettingsModal() {
-      const modal = document.getElementById('categorySettingsModal');
-      const listContainer = document.getElementById('categorySettingsList');
-
-      modal.classList.add('active');
-      listContainer.innerHTML = '<div style="text-align: center; padding: 20px; color: #888;">載入中...</div>';
-
-      try {
-        const response = await fetch('/api/category-settings');
-        categorySettings = await response.json();
-
-        renderCategorySettingsList();
-      } catch (error) {
-        listContainer.innerHTML = `<div style="color: #ff6b6b;">載入失敗: ${error.message}</div>`;
-      }
-    }
-
-    // 關閉分類設定 Modal
-    function closeCategorySettingsModal() {
-      document.getElementById('categorySettingsModal').classList.remove('active');
-      document.getElementById('categorySettingsResult').innerHTML = '';
-    }
-
-    // 渲染分類設定列表
-    function renderCategorySettingsList() {
-      const listContainer = document.getElementById('categorySettingsList');
-
-      if (!categorySettings || !categorySettings.availableCategories) {
-        listContainer.innerHTML = '<div style="color: #ff6b6b;">無可用分類</div>';
-        return;
-      }
-
-      const enabledSet = new Set(categorySettings.enabledCategories || []);
-
-      listContainer.innerHTML = categorySettings.availableCategories.map(cat => `
-        <div class="category-setting-item ${enabledSet.has(cat.id) ? 'enabled' : ''}"
-             onclick="toggleCategorySetting('${cat.id}')">
-          <input type="checkbox"
-                 class="category-setting-checkbox"
-                 id="cat-${cat.id}"
-                 ${enabledSet.has(cat.id) ? 'checked' : ''}
-                 onclick="event.stopPropagation(); toggleCategorySetting('${cat.id}')">
-          <div class="category-setting-info">
-            <div class="category-setting-name">${cat.name}</div>
-            <div class="category-setting-name-jp">${cat.nameJP}</div>
-          </div>
-        </div>
-      `).join('');
-    }
-
-    // 切換分類啟用狀態
-    function toggleCategorySetting(categoryId) {
-      if (!categorySettings) return;
-
-      const enabledSet = new Set(categorySettings.enabledCategories || []);
-
-      if (enabledSet.has(categoryId)) {
-        enabledSet.delete(categoryId);
-      } else {
-        enabledSet.add(categoryId);
-      }
-
-      categorySettings.enabledCategories = Array.from(enabledSet);
-      renderCategorySettingsList();
-    }
-
-    // 儲存分類設定
-    async function saveCategorySettings() {
-      const resultDiv = document.getElementById('categorySettingsResult');
-
-      if (!categorySettings) {
-        resultDiv.innerHTML = '<div style="color: #ff6b6b;">無設定可儲存</div>';
-        return;
-      }
-
-      try {
-        const response = await fetch('/api/category-settings', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            enabledCategories: categorySettings.enabledCategories
-          })
-        });
-
-        const data = await response.json();
-
-        if (response.ok) {
-          resultDiv.innerHTML = `
-            <div style="color: #00b894; padding: 10px; background: rgba(0,184,148,0.1); border-radius: 8px;">
-              ✓ 設定已儲存！請點擊「更新全部資料」以套用新設定。
-            </div>
-          `;
-          showToast('分類設定已儲存', 'success');
-
-          // 2秒後關閉
-          setTimeout(() => {
-            closeCategorySettingsModal();
-          }, 2000);
-        } else {
-          resultDiv.innerHTML = `<div style="color: #ff6b6b;">儲存失敗: ${data.error}</div>`;
-          showToast(data.error, 'error');
-        }
-      } catch (error) {
-        resultDiv.innerHTML = `<div style="color: #ff6b6b;">請求失敗: ${error.message}</div>`;
-        showToast('請求失敗: ' + error.message, 'error');
-      }
-    }
 
     // ============ 手動分類相關函數 ============
 

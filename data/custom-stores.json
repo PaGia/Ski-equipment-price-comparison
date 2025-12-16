@@ -9,27 +9,11 @@
     "usePuppeteer": true,
     "categories": [
       {
-        "id": "2746395",
-        "name": "ウェア",
-        "originalName": "ウェア",
-        "url": "https://sportsbomber.base.shop/categories/2746395",
-        "type": "ウェア",
-        "enabled": true
-      },
-      {
         "id": "2746389",
         "name": "スノーボード",
         "originalName": "スノーボード",
         "url": "https://sportsbomber.base.shop/categories/2746389",
-        "type": "スノーボード",
-        "enabled": true
-      },
-      {
-        "id": "6735410",
-        "name": "ヘルメット",
-        "originalName": "ヘルメット",
-        "url": "https://sportsbomber.base.shop/categories/6735410",
-        "type": "ヘルメット",
+        "type": "snowboard",
         "enabled": true
       }
     ],
@@ -51,14 +35,6 @@
         "url": "https://comorsports.com/collections/snowboard",
         "type": "snowboard",
         "enabled": true
-      },
-      {
-        "id": "snow-helmets",
-        "name": "ヘルメット",
-        "originalName": "Helmets",
-        "url": "https://comorsports.com/collections/snow-helmets",
-        "type": "helmet",
-        "enabled": true
       }
     ],
     "addedAt": "2025-12-15T05:51:35.108Z"
@@ -77,15 +53,7 @@
         "name": "スノーボード",
         "originalName": "スノーボード",
         "url": "https://switchsnow.thebase.in/categories/2430208",
-        "type": "スノーボード",
-        "enabled": true
-      },
-      {
-        "id": "2492359",
-        "name": "ヘルメット",
-        "originalName": "ヘルメット",
-        "url": "https://switchsnow.thebase.in/categories/2492359",
-        "type": "ヘルメット",
+        "type": "snowboard",
         "enabled": true
       }
     ],
@@ -99,6 +67,16 @@
     "country": "JP",
     "type": "custom",
     "usePuppeteer": true,
+    "categories": [
+      {
+        "id": "4415593",
+        "name": "スノーボード",
+        "originalName": "スノーボード",
+        "url": "https://snowboardmds.thebase.in/categories/4415593",
+        "type": "snowboard",
+        "enabled": true
+      }
+    ],
     "addedAt": "2025-12-13T18:31:26.106Z"
   }
 }
