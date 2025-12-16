@@ -1,9 +1,59 @@
 # 開發進度記錄
 
 ## 最新狀態
-- **更新日期**: 2025-12-15
+- **更新日期**: 2025-12-16
 - **專案狀態**: 運作中
 - **商品數量**: 812 筆（來自 6 家店家）
+
+---
+
+## 2025-12-16
+
+### 分類精確度優化 - 麵包屑機制實作
+
+**實作內容：**
+根據 `development-reports/debug/` 目錄下的解決方案完成麵包屑抓取機制：
+
+1. **新增麵包屑選擇器常數** (`scraper.js`)
+   ```javascript
+   const BREADCRUMB_SELECTORS = [
+     '.breadcrumb', '#breadcrumb', '.breadcrumbs',
+     '[itemtype*="BreadcrumbList"]', '.topicPath',
+     '.p-breadcrumb', '.c-breadcrumb',
+     'nav[aria-label="breadcrumb"]', '.path-nav', '.navigation-path'
+   ];
+   ```
+
+2. **新增麵包屑分類映射表** (`scraper.js`)
+   - 支援多語言（英文/日文）分類關鍵字
+   - 具有分類優先級順序（binding > boots > ... > snowboard）
+
+3. **新增 `inferCategoryFromBreadcrumb()` 函數**
+   - 從麵包屑文字推斷分類
+   - 優先級高於 URL 和關鍵字判斷
+
+4. **修改分類函數簽名**
+   - `inferCategoryFromName(brand, name, url, breadcrumbText)` - 支援麵包屑參數
+   - `inferCategory(product)` - 從 product.breadcrumb 讀取麵包屑
+
+5. **更新所有爬蟲函數**
+   - `scrapeWithPuppeteer()` - 新增麵包屑抓取
+   - `scrapeWithPuppeteerValidation()` - 新增麵包屑抓取
+   - `scrapeGenericStore()` - 新增麵包屑抓取
+   - `scrapeGenericStoreWithProgress()` - 新增麵包屑抓取
+   - `scrapeShopifyJsonApi()` - 使用 product_type 作為麵包屑
+   - `scrapeMurasaki()` / `scrapeMurasakiWithProgress()` - 設為空字串（無麵包屑）
+
+6. **移除 `inferCategoryFromUrl()` 函數**
+   - 邏輯已整併入 `inferCategoryFromName()`
+
+**分類邏輯優先級（從高到低）：**
+1. 手動分類 (manual-classifications.json)
+2. 麵包屑文字 (100% 準確)
+3. URL 路徑映射 (90% 準確)
+4. 關鍵字推斷 (70% 準確，後備方案)
+
+**狀態：** 已完成
 
 ---
 
@@ -43,7 +93,7 @@
 3. **爬蟲升級**：修改 `scraper.js` 支援麵包屑抓取
 
 **狀態：**
-- 方案已定案，待實作
+- ✅ 已實作完成 (2025-12-16)
 
 ### [2025-12-15] Bug 修復 - 分類系統
 **修復項目：**

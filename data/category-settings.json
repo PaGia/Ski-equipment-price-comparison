@@ -1,7 +1,8 @@
 {
   "enabledCategories": [
     "snowboard",
-    "helmet"
+    "helmet",
+    "binding"
   ],
   "availableCategories": [
     {
@@ -55,5 +56,5 @@
       "nameJP": "アクセサリー"
     }
   ],
-  "updatedAt": "2025-12-15T06:03:12.238Z"
+  "updatedAt": "2025-12-16T04:23:09.409Z"
 }

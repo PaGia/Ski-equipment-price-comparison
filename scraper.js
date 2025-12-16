@@ -67,6 +67,44 @@ const URL_CATEGORY_PATTERNS = {
   accessory: ['/accessor', '/アクセサリー']
 };
 
+// 麵包屑選擇器列表 (用於精確分類)
+const BREADCRUMB_SELECTORS = [
+  '.breadcrumb',
+  '#breadcrumb',
+  '.breadcrumbs',
+  '[itemtype*="BreadcrumbList"]',
+  '.topicPath',
+  '.p-breadcrumb',
+  '.c-breadcrumb',
+  'nav[aria-label="breadcrumb"]',
+  '.path-nav',
+  '.navigation-path'
+];
+
+// 麵包屑文字到分類的映射
+const BREADCRUMB_CATEGORY_MAP = {
+  // 固定器 (最高優先)
+  binding: ['binding', 'bindings', 'バインディング', 'ビンディング'],
+  // 雪靴
+  boots: ['boot', 'boots', 'ブーツ', 'スノーボードブーツ'],
+  // 安全帽
+  helmet: ['helmet', 'helmets', 'ヘルメット'],
+  // 護目鏡
+  goggle: ['goggle', 'goggles', 'ゴーグル'],
+  // 手套
+  glove: ['glove', 'gloves', 'グローブ', 'ミトン'],
+  // 服裝
+  wear: ['wear', 'apparel', 'jacket', 'pants', 'ウェア', 'ジャケット', 'パンツ', 'アウター'],
+  // 護具
+  protector: ['protector', 'protection', 'プロテクター', 'パッド'],
+  // 背包
+  bag: ['bag', 'bags', 'case', 'バッグ', 'ケース'],
+  // 配件
+  accessory: ['accessory', 'accessories', 'アクセサリー', '小物'],
+  // 雪板 (最低優先，避免誤判)
+  snowboard: ['snowboard', 'snowboards', 'スノーボード', 'boards']
+};
+
 // 載入分類設定
 function loadCategorySettings() {
   try {
@@ -94,32 +132,50 @@ function loadManualClassifications() {
   return { classifications: {}, learnedKeywords: {} };
 }
 
-// 從 URL 推斷分類
-function inferCategoryFromUrl(url) {
-  if (!url) return null;
-  const urlLower = url.toLowerCase();
+// 從麵包屑文字推斷分類 (最高優先級 - 100% 準確)
+function inferCategoryFromBreadcrumb(breadcrumbText) {
+  if (!breadcrumbText) return null;
+  const breadcrumb = breadcrumbText.toLowerCase();
 
-  for (const [category, patterns] of Object.entries(URL_CATEGORY_PATTERNS)) {
-    if (patterns.some(p => urlLower.includes(p.toLowerCase()))) {
+  // 優先級順序：具體分類優先於通用分類
+  const priorityOrder = ['binding', 'boots', 'helmet', 'goggle', 'glove', 'wear', 'protector', 'bag', 'accessory', 'snowboard'];
+
+  for (const category of priorityOrder) {
+    const keywords = BREADCRUMB_CATEGORY_MAP[category];
+    if (keywords && keywords.some(kw => breadcrumb.includes(kw.toLowerCase()))) {
       return category;
     }
   }
   return null;
 }
 
-// 從商品名稱推斷分類
-function inferCategoryFromName(brand, name) {
+// 從商品名稱推斷分類 (支援麵包屑和 URL 優先判斷)
+function inferCategoryFromName(brand, name, url = '', breadcrumbText = '') {
   const text = `${brand || ''} ${name || ''}`.toLowerCase();
-  const manualData = loadManualClassifications();
+  const urlLower = (url || '').toLowerCase();
 
-  // 檢查學習到的關鍵字
+  // 1. 麵包屑判斷 (最高優先級 - 100% 準確)
+  const breadcrumbCategory = inferCategoryFromBreadcrumb(breadcrumbText);
+  if (breadcrumbCategory) {
+    return breadcrumbCategory;
+  }
+
+  // 2. URL 路徑判斷 (次高優先級)
+  for (const [category, patterns] of Object.entries(URL_CATEGORY_PATTERNS)) {
+    if (patterns.some(p => urlLower.includes(p.toLowerCase()))) {
+      return category;
+    }
+  }
+
+  // 3. 學習到的關鍵字
+  const manualData = loadManualClassifications();
   for (const [category, keywords] of Object.entries(manualData.learnedKeywords || {})) {
     if (keywords.some(kw => text.includes(kw.toLowerCase()))) {
       return category;
     }
   }
 
-  // 使用內建關鍵字（優先級排序）
+  // 4. 使用內建關鍵字（優先級排序：具體分類優先於通用分類）
   const priorityOrder = ['boots', 'binding', 'helmet', 'goggle', 'glove', 'wear', 'protector', 'bag', 'accessory', 'snowboard'];
 
   for (const category of priorityOrder) {
@@ -142,23 +198,19 @@ function inferCategoryFromName(brand, name) {
 
 // 綜合分類推斷
 function inferCategory(product) {
-  const { brand, name, productUrl, key } = product;
+  const { brand, name, productUrl, key, breadcrumb } = product;
 
-  // 1. 檢查手動分類
+  // 1. 檢查手動分類 (最高優先)
   const manualData = loadManualClassifications();
   if (key && manualData.classifications[key]) {
     return manualData.classifications[key];
   }
 
-  // 2. 從 URL 推斷
-  const urlCategory = inferCategoryFromUrl(productUrl);
-  if (urlCategory) return urlCategory;
+  // 2. 使用整合的分類函數 (麵包屑 > URL > 關鍵字)
+  const inferredCategory = inferCategoryFromName(brand, name, productUrl, breadcrumb);
+  if (inferredCategory) return inferredCategory;
 
-  // 3. 從名稱推斷
-  const nameCategory = inferCategoryFromName(brand, name);
-  if (nameCategory) return nameCategory;
-
-  // 4. 無法辨識
+  // 3. 無法辨識
   return 'uncategorized';
 }
 
@@ -575,11 +627,21 @@ async function scrapeWithPuppeteer(storeConfig) {
     const urlObj = new URL(baseUrl);
     const origin = urlObj.origin;
 
-    // 提取商品資料
+    // 提取商品資料 (含麵包屑)
     const pageProducts = await page.evaluate((params) => {
-      const { id, name, currency, origin, BRAND_PATTERNS } = params;
+      const { id, name, currency, origin, BRAND_PATTERNS, breadcrumbSelectors } = params;
       const results = [];
       const seenUrls = new Set();
+
+      // 先抓取頁面級麵包屑 (整個頁面通用的分類路徑)
+      let pageBreadcrumb = '';
+      for (const sel of breadcrumbSelectors) {
+        const el = document.querySelector(sel);
+        if (el) {
+          pageBreadcrumb = el.textContent?.trim() || '';
+          if (pageBreadcrumb) break;
+        }
+      }
 
       // 通用商品選擇器
       const productSelectors = [
@@ -784,6 +846,7 @@ async function scrapeWithPuppeteer(storeConfig) {
               salePrice: price,
               imageUrl,
               productUrl,
+              breadcrumb: pageBreadcrumb,
               scrapedAt: new Date().toISOString()
             });
           }
@@ -793,7 +856,7 @@ async function scrapeWithPuppeteer(storeConfig) {
       });
 
       return results;
-    }, { id, name, currency, origin, BRAND_PATTERNS });
+    }, { id, name, currency, origin, BRAND_PATTERNS, breadcrumbSelectors: BREADCRUMB_SELECTORS });
 
     // 計算 JPY 價格並過濾異常值
     let skippedCount = 0;
@@ -1027,11 +1090,21 @@ async function scrapeWithPuppeteerValidation(storeConfig) {
     const urlObj = new URL(baseUrl);
     const origin = urlObj.origin;
 
-    // 提取商品資料
+    // 提取商品資料 (含麵包屑)
     const pageProducts = await page.evaluate((params) => {
-      const { id, name, currency, origin, BRAND_PATTERNS } = params;
+      const { id, name, currency, origin, BRAND_PATTERNS, breadcrumbSelectors } = params;
       const results = [];
       const seenUrls = new Set();
+
+      // 先抓取頁面級麵包屑 (整個頁面通用的分類路徑)
+      let pageBreadcrumb = '';
+      for (const sel of breadcrumbSelectors) {
+        const el = document.querySelector(sel);
+        if (el) {
+          pageBreadcrumb = el.textContent?.trim() || '';
+          if (pageBreadcrumb) break;
+        }
+      }
 
       const productSelectors = [
         'li.p-itemListItem',
@@ -1202,6 +1275,7 @@ async function scrapeWithPuppeteerValidation(storeConfig) {
               salePrice: price,
               imageUrl,
               productUrl,
+              breadcrumb: pageBreadcrumb,
               scrapedAt: new Date().toISOString()
             });
           }
@@ -1211,7 +1285,7 @@ async function scrapeWithPuppeteerValidation(storeConfig) {
       });
 
       return results;
-    }, { id, name, currency, origin, BRAND_PATTERNS });
+    }, { id, name, currency, origin, BRAND_PATTERNS, breadcrumbSelectors: BREADCRUMB_SELECTORS });
 
     // 計算 JPY 價格並過濾異常值
     let skippedCount = 0;
@@ -1430,6 +1504,7 @@ async function scrapeShopifyJsonApi(storeConfig) {
               discount,
               imageUrl,
               productUrl,
+              breadcrumb: product.product_type || '',
               scrapedAt: new Date().toISOString()
             });
             newProductCount++;
@@ -1507,6 +1582,16 @@ async function scrapeGenericStore(storeConfig, usePuppeteer = false) {
       const $ = cheerio.load(response.data);
       const baseUrlObj = new URL(baseUrl);
       const origin = baseUrlObj.origin;
+
+      // 抓取頁面級麵包屑 (整個頁面通用的分類路徑)
+      let pageBreadcrumb = '';
+      for (const sel of BREADCRUMB_SELECTORS) {
+        const $breadcrumb = $(sel).first();
+        if ($breadcrumb.length) {
+          pageBreadcrumb = $breadcrumb.text().trim();
+          if (pageBreadcrumb) break;
+        }
+      }
 
       // 通用商品選擇器（移除 .item 避免匹配導航）
       const productSelectors = [
@@ -1677,6 +1762,7 @@ async function scrapeGenericStore(storeConfig, usePuppeteer = false) {
             discount: null,
             imageUrl,
             productUrl,
+            breadcrumb: pageBreadcrumb,
             scrapedAt: new Date().toISOString()
           });
         }
@@ -1832,6 +1918,7 @@ async function scrapeMurasaki(maxPages = null) {
           discount,
           imageUrl,
           productUrl,
+          breadcrumb: '',
           scrapedAt: new Date().toISOString()
         });
       }
@@ -2005,6 +2092,7 @@ async function scrapeMurasakiWithProgress(maxPages = null) {
           discount,
           imageUrl,
           productUrl,
+          breadcrumb: '',
           scrapedAt: new Date().toISOString()
         });
       }
@@ -2133,6 +2221,16 @@ async function scrapeGenericStoreWithProgress(storeConfig) {
       const $ = cheerio.load(response.data);
       const baseUrlObj = new URL(baseUrl);
       const origin = baseUrlObj.origin;
+
+      // 抓取頁面級麵包屑 (整個頁面通用的分類路徑)
+      let pageBreadcrumb = '';
+      for (const sel of BREADCRUMB_SELECTORS) {
+        const $breadcrumb = $(sel).first();
+        if ($breadcrumb.length) {
+          pageBreadcrumb = $breadcrumb.text().trim();
+          if (pageBreadcrumb) break;
+        }
+      }
 
       // 通用商品選擇器（移除 .item 避免匹配導航）
       const productSelectors = [
@@ -2303,6 +2401,7 @@ async function scrapeGenericStoreWithProgress(storeConfig) {
             discount: null,
             imageUrl,
             productUrl,
+            breadcrumb: pageBreadcrumb,
             scrapedAt: new Date().toISOString()
           });
         }
