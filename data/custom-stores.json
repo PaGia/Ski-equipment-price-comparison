@@ -9,6 +9,14 @@
     "usePuppeteer": true,
     "categories": [
       {
+        "id": "2746395",
+        "name": "ウェア",
+        "originalName": "ウェア",
+        "url": "https://sportsbomber.base.shop/categories/2746395",
+        "type": "ウェア",
+        "enabled": true
+      },
+      {
         "id": "2746389",
         "name": "スノーボード",
         "originalName": "スノーボード",
@@ -25,17 +33,35 @@
         "enabled": true
       }
     ],
-    "addedAt": "2025-12-14T10:12:06.757Z"
+    "addedAt": "2025-12-15T04:22:45.783Z"
   },
   "comorsports-com": {
     "id": "comorsports-com",
     "name": "Comorsports",
-    "baseUrl": "https://comorsports.com/collections/sale-snowboard?product_type=Snowboards",
+    "baseUrl": "https://comorsports.com",
     "currency": "USD",
     "country": "US",
     "type": "custom",
-    "usePuppeteer": false,
-    "addedAt": "2025-12-13T14:09:53.558Z"
+    "usePuppeteer": true,
+    "categories": [
+      {
+        "id": "snowboard",
+        "name": "スノーボード",
+        "originalName": "SNOWBOARD",
+        "url": "https://comorsports.com/collections/snowboard",
+        "type": "snowboard",
+        "enabled": true
+      },
+      {
+        "id": "snow-helmets",
+        "name": "ヘルメット",
+        "originalName": "Helmets",
+        "url": "https://comorsports.com/collections/snow-helmets",
+        "type": "helmet",
+        "enabled": true
+      }
+    ],
+    "addedAt": "2025-12-15T05:51:35.108Z"
   },
   "switchsnow-thebase-in": {
     "id": "switchsnow-thebase-in",
@@ -63,7 +89,7 @@
         "enabled": true
       }
     ],
-    "addedAt": "2025-12-14T11:12:49.849Z"
+    "addedAt": "2025-12-15T06:26:11.232Z"
   },
   "snowboardmds-thebase-in": {
     "id": "snowboardmds-thebase-in",

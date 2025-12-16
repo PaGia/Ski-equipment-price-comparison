@@ -899,6 +899,96 @@
       color: rgba(255, 255, 255, 0.5);
     }
 
+    /* 分類設定樣式 */
+    .category-settings-list {
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    .category-setting-item {
+      display: flex;
+      align-items: center;
+      padding: 12px 15px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      margin-bottom: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .category-setting-item:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .category-setting-item.enabled {
+      border-color: rgba(0, 184, 148, 0.5);
+      background: rgba(0, 184, 148, 0.1);
+    }
+
+    .category-setting-checkbox {
+      width: 20px;
+      height: 20px;
+      margin-right: 12px;
+      cursor: pointer;
+      accent-color: #00b894;
+    }
+
+    .category-setting-info {
+      flex: 1;
+    }
+
+    .category-setting-name {
+      font-weight: 500;
+      margin-bottom: 2px;
+    }
+
+    .category-setting-name-jp {
+      font-size: 0.8rem;
+      color: rgba(255, 255, 255, 0.5);
+    }
+
+    /* 待分類商品樣式 */
+    .product-card.uncategorized {
+      border-color: rgba(255, 107, 107, 0.3);
+    }
+
+    .manual-classify-section {
+      padding: 10px 15px;
+      background: rgba(255, 107, 107, 0.1);
+      border-top: 1px solid rgba(255, 107, 107, 0.2);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .manual-classify-section label {
+      font-size: 0.85rem;
+      color: #ff6b6b;
+      white-space: nowrap;
+    }
+
+    .classify-select {
+      flex: 1;
+      padding: 8px 12px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 6px;
+      background: rgba(0, 0, 0, 0.3);
+      color: #fff;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+
+    .classify-select:focus {
+      outline: none;
+      border-color: #00b894;
+    }
+
+    .classify-select option {
+      background: #1a1a2e;
+      color: #fff;
+    }
+
     /* 進度條樣式 */
     .progress-container {
       position: fixed;
@@ -1036,6 +1126,12 @@
     <button class="btn btn-secondary" onclick="loadProducts()">
       <span>📊</span> 重新載入
     </button>
+    <button class="btn btn-secondary" onclick="reclassifyProducts()">
+      <span>🏷️</span> 重新分類
+    </button>
+    <button class="btn btn-secondary" onclick="openCategorySettingsModal()">
+      <span>📁</span> 分類管理
+    </button>
     <div class="view-toggle">
       <button class="view-btn active" id="gridViewBtn" onclick="setViewMode('grid')" title="卡片檢視">
         ▦
@@ -1127,6 +1223,27 @@
         <div class="loading-spinner"></div>
         <p>載入商品資料中...</p>
       </div>
+    </div>
+  </div>
+
+  <!-- 分類管理 Modal -->
+  <div class="modal-overlay" id="categorySettingsModal">
+    <div class="modal">
+      <h2>📁 分類管理</h2>
+      <p style="color: #888; font-size: 0.9rem; margin-bottom: 15px;">
+        勾選要追蹤的商品分類。未勾選的分類在「更新全部資料」時將不會被抓取。
+      </p>
+
+      <div class="category-settings-list" id="categorySettingsList">
+        <!-- 動態填入分類列表 -->
+      </div>
+
+      <div class="modal-buttons" style="margin-top: 20px;">
+        <button type="button" class="btn btn-cancel" onclick="closeCategorySettingsModal()">取消</button>
+        <button type="button" class="btn btn-success" onclick="saveCategorySettings()">儲存設定</button>
+      </div>
+
+      <div id="categorySettingsResult" style="margin-top: 15px;"></div>
     </div>
   </div>
 
@@ -1511,6 +1628,18 @@
         }
       });
 
+      // 檢查是否有待分類商品，如果有則添加「待分類」選項
+      const hasUncategorized = allProducts.some(p =>
+        !p.categories || p.categories.length === 0 || p.categories.includes('uncategorized')
+      );
+      if (hasUncategorized) {
+        const option = document.createElement('option');
+        option.value = 'uncategorized';
+        option.textContent = '⚠️ 待分類';
+        option.style.color = '#ff6b6b';
+        categoryFilter.appendChild(option);
+      }
+
       // 如果之前選擇的值還存在，恢復選擇
       if (currentValue && Array.from(categoryFilter.options).some(opt => opt.value === currentValue)) {
         categoryFilter.value = currentValue;
@@ -1522,6 +1651,13 @@
 
     function matchCategory(product, category) {
       if (category === 'all') return true;
+
+      // 待分類篩選
+      if (category === 'uncategorized') {
+        return !product.categories ||
+               product.categories.length === 0 ||
+               product.categories.includes('uncategorized');
+      }
 
       // 如果商品有分類資訊，根據分類篩選
       if (product.categories && product.categories.length > 0) {
@@ -1679,12 +1815,16 @@
     // 卡片檢視
     function renderGridView(products) {
       const content = document.getElementById('content');
+      const currentCategory = document.getElementById('categoryFilter').value;
+      const isUncategorizedView = currentCategory === 'uncategorized';
+
       const html = `
         <div class="product-grid">
           ${products.map(product => {
             const isExpanded = expandedProducts.has(product.key);
+            const isUncategorized = !product.categories || product.categories.length === 0 || product.categories.includes('uncategorized');
             return `
-              <div class="product-card">
+              <div class="product-card ${isUncategorized ? 'uncategorized' : ''}">
                 ${product.imageUrl
                   ? `<img src="${product.imageUrl}" alt="${product.name}" class="product-image" loading="lazy" onerror="this.outerHTML='<div class=\\'product-image-placeholder\\'>🏂</div>'">`
                   : '<div class="product-image-placeholder">🏂</div>'
@@ -1700,6 +1840,24 @@
                     <span class="store-count">${product.lowestStore}</span>
                   </div>
                 </div>
+                ${isUncategorizedView && isUncategorized ? `
+                  <div class="manual-classify-section">
+                    <label>手動分類:</label>
+                    <select class="classify-select" onchange="manualClassify('${product.key}', this.value)">
+                      <option value="">選擇分類...</option>
+                      <option value="snowboard">雪板</option>
+                      <option value="binding">固定器</option>
+                      <option value="boots">雪靴</option>
+                      <option value="helmet">安全帽</option>
+                      <option value="goggle">護目鏡</option>
+                      <option value="glove">手套</option>
+                      <option value="wear">服裝</option>
+                      <option value="protector">護具</option>
+                      <option value="bag">背包</option>
+                      <option value="accessory">配件</option>
+                    </select>
+                  </div>
+                ` : ''}
                 <button class="expand-btn ${isExpanded ? 'expanded' : ''}" onclick="toggleExpand('${product.key}')">
                   <span>查看 ${product.storeCount} 家店家價格</span>
                   <span class="arrow">▼</span>
@@ -2408,7 +2566,205 @@
       if (e.target.id === 'storeModal') {
         closeStoreModal();
       }
+      if (e.target.id === 'categorySettingsModal') {
+        closeCategorySettingsModal();
+      }
     });
+
+    // ============ 分類設定相關函數 ============
+
+    let categorySettings = null;
+
+    // 開啟分類設定 Modal
+    async function openCategorySettingsModal() {
+      const modal = document.getElementById('categorySettingsModal');
+      const listContainer = document.getElementById('categorySettingsList');
+
+      modal.classList.add('active');
+      listContainer.innerHTML = '<div style="text-align: center; padding: 20px; color: #888;">載入中...</div>';
+
+      try {
+        const response = await fetch('/api/category-settings');
+        categorySettings = await response.json();
+
+        renderCategorySettingsList();
+      } catch (error) {
+        listContainer.innerHTML = `<div style="color: #ff6b6b;">載入失敗: ${error.message}</div>`;
+      }
+    }
+
+    // 關閉分類設定 Modal
+    function closeCategorySettingsModal() {
+      document.getElementById('categorySettingsModal').classList.remove('active');
+      document.getElementById('categorySettingsResult').innerHTML = '';
+    }
+
+    // 渲染分類設定列表
+    function renderCategorySettingsList() {
+      const listContainer = document.getElementById('categorySettingsList');
+
+      if (!categorySettings || !categorySettings.availableCategories) {
+        listContainer.innerHTML = '<div style="color: #ff6b6b;">無可用分類</div>';
+        return;
+      }
+
+      const enabledSet = new Set(categorySettings.enabledCategories || []);
+
+      listContainer.innerHTML = categorySettings.availableCategories.map(cat => `
+        <div class="category-setting-item ${enabledSet.has(cat.id) ? 'enabled' : ''}"
+             onclick="toggleCategorySetting('${cat.id}')">
+          <input type="checkbox"
+                 class="category-setting-checkbox"
+                 id="cat-${cat.id}"
+                 ${enabledSet.has(cat.id) ? 'checked' : ''}
+                 onclick="event.stopPropagation(); toggleCategorySetting('${cat.id}')">
+          <div class="category-setting-info">
+            <div class="category-setting-name">${cat.name}</div>
+            <div class="category-setting-name-jp">${cat.nameJP}</div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // 切換分類啟用狀態
+    function toggleCategorySetting(categoryId) {
+      if (!categorySettings) return;
+
+      const enabledSet = new Set(categorySettings.enabledCategories || []);
+
+      if (enabledSet.has(categoryId)) {
+        enabledSet.delete(categoryId);
+      } else {
+        enabledSet.add(categoryId);
+      }
+
+      categorySettings.enabledCategories = Array.from(enabledSet);
+      renderCategorySettingsList();
+    }
+
+    // 儲存分類設定
+    async function saveCategorySettings() {
+      const resultDiv = document.getElementById('categorySettingsResult');
+
+      if (!categorySettings) {
+        resultDiv.innerHTML = '<div style="color: #ff6b6b;">無設定可儲存</div>';
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/category-settings', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            enabledCategories: categorySettings.enabledCategories
+          })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          resultDiv.innerHTML = `
+            <div style="color: #00b894; padding: 10px; background: rgba(0,184,148,0.1); border-radius: 8px;">
+              ✓ 設定已儲存！請點擊「更新全部資料」以套用新設定。
+            </div>
+          `;
+          showToast('分類設定已儲存', 'success');
+
+          // 2秒後關閉
+          setTimeout(() => {
+            closeCategorySettingsModal();
+          }, 2000);
+        } else {
+          resultDiv.innerHTML = `<div style="color: #ff6b6b;">儲存失敗: ${data.error}</div>`;
+          showToast(data.error, 'error');
+        }
+      } catch (error) {
+        resultDiv.innerHTML = `<div style="color: #ff6b6b;">請求失敗: ${error.message}</div>`;
+        showToast('請求失敗: ' + error.message, 'error');
+      }
+    }
+
+    // ============ 手動分類相關函數 ============
+
+    // 手動分類商品
+    async function manualClassify(productKey, category) {
+      if (!category) return;
+
+      try {
+        const response = await fetch('/api/classify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            productKey,
+            category
+          })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          showToast(`已將商品分類為「${getCategoryDisplayName(category)}」`, 'success');
+
+          // 更新本地資料
+          const product = allProducts.find(p => p.key === productKey);
+          if (product) {
+            if (!product.categories) product.categories = [];
+            product.categories = product.categories.filter(c => c !== 'uncategorized');
+            if (!product.categories.includes(category)) {
+              product.categories.push(category);
+            }
+          }
+
+          // 重新篩選和渲染
+          filterProducts();
+          updateCategoryFilter();
+        } else {
+          showToast(data.error || '分類失敗', 'error');
+        }
+      } catch (error) {
+        showToast('請求失敗: ' + error.message, 'error');
+      }
+    }
+
+    // 獲取分類顯示名稱
+    function getCategoryDisplayName(category) {
+      const names = {
+        snowboard: '雪板',
+        binding: '固定器',
+        boots: '雪靴',
+        helmet: '安全帽',
+        goggle: '護目鏡',
+        glove: '手套',
+        wear: '服裝',
+        protector: '護具',
+        bag: '背包',
+        accessory: '配件'
+      };
+      return names[category] || category;
+    }
+
+    // 重新分類所有商品（不重新抓取）
+    async function reclassifyProducts() {
+      if (!confirm('確定要重新分類所有商品嗎？這不會重新抓取資料，只會根據商品名稱和 URL 重新判斷分類。')) {
+        return;
+      }
+
+      showToast('正在重新分類...', 'info');
+
+      try {
+        const response = await fetch('/api/reclassify', { method: 'POST' });
+        const data = await response.json();
+
+        if (response.ok) {
+          showToast(`${data.message}`, 'success');
+          loadProducts(); // 重新載入顯示
+        } else {
+          showToast(data.error || '重新分類失敗', 'error');
+        }
+      } catch (error) {
+        showToast('請求失敗: ' + error.message, 'error');
+      }
+    }
 
     // 頁面載入時執行
     document.addEventListener('DOMContentLoaded', loadProducts);

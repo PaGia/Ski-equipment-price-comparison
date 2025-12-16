@@ -11,6 +11,8 @@ const {
   removeCustomStore,
   getAllStores,
   getProgress,
+  inferCategory,
+  normalizeCategoryName,
   DATA_FILE
 } = require('./scraper');
 
@@ -26,6 +28,258 @@ const dataDir = path.join(__dirname, 'data');
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
+
+// 分類設定檔路徑
+const CATEGORY_SETTINGS_FILE = path.join(dataDir, 'category-settings.json');
+const MANUAL_CLASSIFICATIONS_FILE = path.join(dataDir, 'manual-classifications.json');
+
+// 預設分類設定
+const DEFAULT_CATEGORY_SETTINGS = {
+  enabledCategories: ['snowboard', 'binding', 'boots', 'helmet', 'goggle', 'wear'],
+  availableCategories: [
+    { id: 'snowboard', name: '雪板', nameJP: 'スノーボード' },
+    { id: 'binding', name: '固定器', nameJP: 'バインディング' },
+    { id: 'boots', name: '雪靴', nameJP: 'ブーツ' },
+    { id: 'helmet', name: '安全帽', nameJP: 'ヘルメット' },
+    { id: 'goggle', name: '護目鏡', nameJP: 'ゴーグル' },
+    { id: 'glove', name: '手套', nameJP: 'グローブ' },
+    { id: 'wear', name: '服裝', nameJP: 'ウェア' },
+    { id: 'protector', name: '護具', nameJP: 'プロテクター' },
+    { id: 'bag', name: '背包', nameJP: 'バッグ' },
+    { id: 'accessory', name: '配件', nameJP: 'アクセサリー' }
+  ],
+  updatedAt: new Date().toISOString()
+};
+
+// 載入分類設定
+function loadCategorySettings() {
+  try {
+    if (fs.existsSync(CATEGORY_SETTINGS_FILE)) {
+      return JSON.parse(fs.readFileSync(CATEGORY_SETTINGS_FILE, 'utf-8'));
+    }
+  } catch (e) {
+    console.error('載入分類設定失敗:', e);
+  }
+  return DEFAULT_CATEGORY_SETTINGS;
+}
+
+// 儲存分類設定
+function saveCategorySettings(settings) {
+  settings.updatedAt = new Date().toISOString();
+  fs.writeFileSync(CATEGORY_SETTINGS_FILE, JSON.stringify(settings, null, 2), 'utf-8');
+}
+
+// 載入手動分類
+function loadManualClassifications() {
+  try {
+    if (fs.existsSync(MANUAL_CLASSIFICATIONS_FILE)) {
+      return JSON.parse(fs.readFileSync(MANUAL_CLASSIFICATIONS_FILE, 'utf-8'));
+    }
+  } catch (e) {
+    console.error('載入手動分類失敗:', e);
+  }
+  return { classifications: {}, learnedKeywords: {}, updatedAt: new Date().toISOString() };
+}
+
+// 儲存手動分類
+function saveManualClassifications(data) {
+  data.updatedAt = new Date().toISOString();
+  fs.writeFileSync(MANUAL_CLASSIFICATIONS_FILE, JSON.stringify(data, null, 2), 'utf-8');
+}
+
+// ============ 分類設定 API ============
+
+// API: 獲取分類設定
+app.get('/api/category-settings', (req, res) => {
+  try {
+    const settings = loadCategorySettings();
+    res.json(settings);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// API: 更新分類設定
+app.put('/api/category-settings', (req, res) => {
+  try {
+    const { enabledCategories } = req.body;
+
+    if (!enabledCategories || !Array.isArray(enabledCategories)) {
+      return res.status(400).json({ error: '請提供啟用的分類列表' });
+    }
+
+    const settings = loadCategorySettings();
+    settings.enabledCategories = enabledCategories;
+    saveCategorySettings(settings);
+
+    res.json({
+      success: true,
+      message: '分類設定已更新',
+      settings
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============ 手動分類 API ============
+
+// API: 獲取手動分類記錄
+app.get('/api/manual-classifications', (req, res) => {
+  try {
+    const data = loadManualClassifications();
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// API: 手動分類商品
+app.post('/api/classify', (req, res) => {
+  try {
+    const { productKey, category, learnKeyword } = req.body;
+
+    if (!productKey || !category) {
+      return res.status(400).json({ error: '請提供商品 key 和分類' });
+    }
+
+    const data = loadManualClassifications();
+
+    // 儲存分類
+    data.classifications[productKey] = category;
+
+    // 如果要學習關鍵字
+    if (learnKeyword) {
+      if (!data.learnedKeywords[category]) {
+        data.learnedKeywords[category] = [];
+      }
+      if (!data.learnedKeywords[category].includes(learnKeyword.toLowerCase())) {
+        data.learnedKeywords[category].push(learnKeyword.toLowerCase());
+      }
+    }
+
+    saveManualClassifications(data);
+
+    // 同時更新商品資料中的分類
+    if (fs.existsSync(DATA_FILE)) {
+      const productsData = JSON.parse(fs.readFileSync(DATA_FILE, 'utf-8'));
+      const product = productsData.products.find(p => p.key === productKey);
+      if (product) {
+        // 確保 categories 是陣列
+        if (!Array.isArray(product.categories)) {
+          product.categories = [];
+        }
+        if (!product.categories.includes(category)) {
+          product.categories.push(category);
+        }
+        // 移除 uncategorized 標記
+        product.categories = product.categories.filter(c => c !== 'uncategorized');
+        fs.writeFileSync(DATA_FILE, JSON.stringify(productsData, null, 2), 'utf-8');
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `已將 ${productKey} 分類為 ${category}`,
+      data
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// API: 獲取待分類商品
+app.get('/api/uncategorized', (req, res) => {
+  try {
+    if (!fs.existsSync(DATA_FILE)) {
+      return res.json({ products: [], count: 0 });
+    }
+
+    const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf-8'));
+    const uncategorized = data.products.filter(p =>
+      !p.categories ||
+      p.categories.length === 0 ||
+      p.categories.includes('uncategorized')
+    );
+
+    res.json({
+      products: uncategorized,
+      count: uncategorized.length
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// API: 刪除手動分類
+app.delete('/api/classify/:productKey', (req, res) => {
+  try {
+    const { productKey } = req.params;
+    const data = loadManualClassifications();
+
+    if (data.classifications[productKey]) {
+      delete data.classifications[productKey];
+      saveManualClassifications(data);
+      res.json({ success: true, message: `已刪除 ${productKey} 的手動分類` });
+    } else {
+      res.status(404).json({ error: '找不到該商品的手動分類' });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// API: 重新分類所有商品（不重新抓取）
+app.post('/api/reclassify', (req, res) => {
+  try {
+    if (!fs.existsSync(DATA_FILE)) {
+      return res.status(404).json({ error: '無商品資料' });
+    }
+
+    const productsData = JSON.parse(fs.readFileSync(DATA_FILE, 'utf-8'));
+    let reclassifiedCount = 0;
+
+    for (const product of productsData.products) {
+      // 取得第一個店家的 URL 用於分類推斷
+      const productUrl = product.stores?.[0]?.productUrl;
+
+      // 推斷分類
+      const inferred = inferCategory({
+        brand: product.brand,
+        name: product.name,
+        productUrl,
+        key: product.key
+      });
+
+      // 標準化分類名稱
+      const normalizedCategory = normalizeCategoryName(inferred);
+
+      // 更新分類
+      if (!product.categories || product.categories.length === 0 ||
+          (product.categories.length === 1 && product.categories[0] === 'uncategorized')) {
+        product.categories = [normalizedCategory];
+        reclassifiedCount++;
+      } else {
+        // 標準化現有分類
+        product.categories = product.categories.map(c => normalizeCategoryName(c));
+      }
+    }
+
+    // 儲存更新後的資料
+    fs.writeFileSync(DATA_FILE, JSON.stringify(productsData, null, 2), 'utf-8');
+
+    res.json({
+      success: true,
+      message: `已重新分類 ${reclassifiedCount} 個商品`,
+      totalProducts: productsData.products.length,
+      reclassifiedCount
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============ 商品 API ============
 
 // API: 獲取商品資料
 app.get('/api/products', (req, res) => {

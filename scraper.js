@@ -6,6 +6,161 @@ const puppeteer = require('puppeteer');
 
 const DATA_FILE = path.join(__dirname, 'data', 'snowboards.json');
 const CUSTOM_STORES_FILE = path.join(__dirname, 'data', 'custom-stores.json');
+const CATEGORY_SETTINGS_FILE = path.join(__dirname, 'data', 'category-settings.json');
+const MANUAL_CLASSIFICATIONS_FILE = path.join(__dirname, 'data', 'manual-classifications.json');
+
+// ============ 分類關鍵字對照表 ============
+const CATEGORY_KEYWORDS = {
+  snowboard: {
+    keywords: ['snowboard', 'スノーボード', 'スノボ', 'board'],
+    excludeKeywords: ['ski', 'スキー', 'binding', 'boot', 'bag', 'case', 'ケース', 'バッグ']
+  },
+  binding: {
+    keywords: ['binding', 'bindings', 'バインディング', 'ビンディング'],
+    excludeKeywords: []
+  },
+  boots: {
+    keywords: ['boot', 'boots', 'ブーツ'],
+    excludeKeywords: ['bag', 'case', 'ケース', 'バッグ']
+  },
+  helmet: {
+    keywords: ['helmet', 'ヘルメット'],
+    excludeKeywords: []
+  },
+  goggle: {
+    keywords: ['goggle', 'goggles', 'ゴーグル'],
+    excludeKeywords: ['strap', 'case', 'ケース', 'bag']
+  },
+  glove: {
+    keywords: ['glove', 'gloves', 'グローブ', 'mitt', 'mitten', 'ミトン'],
+    excludeKeywords: []
+  },
+  wear: {
+    keywords: ['jacket', 'pants', 'pant', 'ジャケット', 'パンツ', 'ウェア', 'wear', 'outerwear'],
+    excludeKeywords: []
+  },
+  protector: {
+    keywords: ['protector', 'protection', 'プロテクター', 'pad', 'パッド', 'guard', 'impact'],
+    excludeKeywords: []
+  },
+  bag: {
+    keywords: ['bag', 'バッグ', 'ケース', 'pack', 'backpack'],
+    excludeKeywords: []
+  },
+  accessory: {
+    keywords: ['stomp', 'leash', 'lock', 'tool', 'wax', 'ワックス', 'デッキパッド', 'tuning'],
+    excludeKeywords: []
+  }
+};
+
+// URL 路徑分析模式
+const URL_CATEGORY_PATTERNS = {
+  snowboard: ['/snowboard', '/boards', 'cat=017', '/スノーボード'],
+  binding: ['/binding', '/bindings', '/バインディング'],
+  boots: ['/boot', '/boots', '/ブーツ'],
+  helmet: ['/helmet', '/ヘルメット'],
+  goggle: ['/goggle', '/ゴーグル'],
+  glove: ['/glove', '/グローブ'],
+  wear: ['/jacket', '/pants', '/wear', '/ウェア', '/ジャケット', '/パンツ'],
+  protector: ['/protector', '/protection', '/プロテクター'],
+  bag: ['/bag', '/case', '/バッグ'],
+  accessory: ['/accessor', '/アクセサリー']
+};
+
+// 載入分類設定
+function loadCategorySettings() {
+  try {
+    if (fs.existsSync(CATEGORY_SETTINGS_FILE)) {
+      return JSON.parse(fs.readFileSync(CATEGORY_SETTINGS_FILE, 'utf-8'));
+    }
+  } catch (e) {
+    console.error('載入分類設定失敗:', e);
+  }
+  return {
+    enabledCategories: ['snowboard', 'binding', 'boots', 'helmet', 'goggle', 'wear'],
+    availableCategories: []
+  };
+}
+
+// 載入手動分類
+function loadManualClassifications() {
+  try {
+    if (fs.existsSync(MANUAL_CLASSIFICATIONS_FILE)) {
+      return JSON.parse(fs.readFileSync(MANUAL_CLASSIFICATIONS_FILE, 'utf-8'));
+    }
+  } catch (e) {
+    console.error('載入手動分類失敗:', e);
+  }
+  return { classifications: {}, learnedKeywords: {} };
+}
+
+// 從 URL 推斷分類
+function inferCategoryFromUrl(url) {
+  if (!url) return null;
+  const urlLower = url.toLowerCase();
+
+  for (const [category, patterns] of Object.entries(URL_CATEGORY_PATTERNS)) {
+    if (patterns.some(p => urlLower.includes(p.toLowerCase()))) {
+      return category;
+    }
+  }
+  return null;
+}
+
+// 從商品名稱推斷分類
+function inferCategoryFromName(brand, name) {
+  const text = `${brand || ''} ${name || ''}`.toLowerCase();
+  const manualData = loadManualClassifications();
+
+  // 檢查學習到的關鍵字
+  for (const [category, keywords] of Object.entries(manualData.learnedKeywords || {})) {
+    if (keywords.some(kw => text.includes(kw.toLowerCase()))) {
+      return category;
+    }
+  }
+
+  // 使用內建關鍵字（優先級排序）
+  const priorityOrder = ['boots', 'binding', 'helmet', 'goggle', 'glove', 'wear', 'protector', 'bag', 'accessory', 'snowboard'];
+
+  for (const category of priorityOrder) {
+    const config = CATEGORY_KEYWORDS[category];
+    if (!config) continue;
+
+    // 檢查排除關鍵字
+    const hasExclude = config.excludeKeywords.some(ex => text.includes(ex.toLowerCase()));
+    if (hasExclude) continue;
+
+    // 檢查包含關鍵字
+    const hasKeyword = config.keywords.some(kw => text.includes(kw.toLowerCase()));
+    if (hasKeyword) {
+      return category;
+    }
+  }
+
+  return null;
+}
+
+// 綜合分類推斷
+function inferCategory(product) {
+  const { brand, name, productUrl, key } = product;
+
+  // 1. 檢查手動分類
+  const manualData = loadManualClassifications();
+  if (key && manualData.classifications[key]) {
+    return manualData.classifications[key];
+  }
+
+  // 2. 從 URL 推斷
+  const urlCategory = inferCategoryFromUrl(productUrl);
+  if (urlCategory) return urlCategory;
+
+  // 3. 從名稱推斷
+  const nameCategory = inferCategoryFromName(brand, name);
+  if (nameCategory) return nameCategory;
+
+  // 4. 無法辨識
+  return 'uncategorized';
+}
 
 // 內建店家設定
 const BUILT_IN_STORES = {
@@ -2229,10 +2384,49 @@ function mergeProducts(allStoreProducts) {
     // 將 Set 轉換為陣列
     product.categories = Array.from(product.categories);
 
+    // 如果沒有分類，嘗試推斷
+    if (product.categories.length === 0) {
+      const inferredCategory = inferCategory({
+        brand: product.brand,
+        name: product.name,
+        productUrl: product.stores[0]?.productUrl,
+        key: product.key
+      });
+      if (inferredCategory && inferredCategory !== 'uncategorized') {
+        product.categories.push(inferredCategory);
+      } else {
+        product.categories.push('uncategorized');
+      }
+    }
+
+    // 標準化分類名稱（轉換日文分類為英文 ID）
+    product.categories = product.categories.map(cat => normalizeCategoryName(cat));
+
     result.push(product);
   }
 
   return result;
+}
+
+// 標準化分類名稱
+function normalizeCategoryName(category) {
+  const mapping = {
+    'スノーボード': 'snowboard',
+    'バインディング': 'binding',
+    'ビンディング': 'binding',
+    'ブーツ': 'boots',
+    'ヘルメット': 'helmet',
+    'ゴーグル': 'goggle',
+    'グローブ': 'glove',
+    'ウェア': 'wear',
+    'ジャケット': 'wear',
+    'パンツ': 'wear',
+    'プロテクター': 'protector',
+    'バッグ': 'bag',
+    'ケース': 'bag',
+    'アクセサリー': 'accessory'
+  };
+  return mapping[category] || category;
 }
 
 // ============ 交叉驗證輔助函數 ============
@@ -2875,11 +3069,12 @@ async function exploreStoreCategories(url) {
             if (categoryMatch) categoryId = categoryMatch[1];
             else if (collectionMatch) categoryId = collectionMatch[1];
 
-            const key = categoryId || fullUrl;
-            if (!seen.has(key)) {
-              seen.add(key);
+            // 使用標準化顯示名稱作為去重 key，避免同一類型的分類出現多次
+            const dedupeKey = displayName || name;
+            if (!seen.has(dedupeKey)) {
+              seen.add(dedupeKey);
               found.push({
-                id: categoryId || key,
+                id: categoryId || dedupeKey,
                 name: displayName || name, // 使用標準化名稱
                 originalName: name, // 保留原始名稱
                 url: fullUrl,
@@ -3360,10 +3555,26 @@ async function scrapeAll(options = {}) {
   // 整合商品
   const mergedProducts = mergeProducts(allProducts);
 
+  // 載入分類設定並過濾
+  const categorySettings = loadCategorySettings();
+  const enabledCategories = new Set(categorySettings.enabledCategories || []);
+
+  // 過濾：只保留啟用分類的商品（保留 uncategorized 以便手動分類）
+  const filteredProducts = mergedProducts.filter(product => {
+    if (!product.categories || product.categories.length === 0) {
+      return true; // 保留無分類商品
+    }
+    // 如果商品有任一啟用的分類，或者是 uncategorized，則保留
+    return product.categories.some(cat =>
+      enabledCategories.has(cat) || cat === 'uncategorized'
+    );
+  });
+
   console.log('\n========================================');
   console.log(`抓取完成！`);
   console.log(`  原始商品: ${allProducts.length} 個`);
   console.log(`  整合後: ${mergedProducts.length} 個獨特商品`);
+  console.log(`  過濾後: ${filteredProducts.length} 個（啟用分類: ${categorySettings.enabledCategories?.join(', ')}）`);
   console.log('========================================');
 
   // 準備店家列表
@@ -3384,11 +3595,10 @@ async function scrapeAll(options = {}) {
   const data = {
     lastUpdated: new Date().toISOString(),
     totalRawProducts: allProducts.length,
-    totalProducts: mergedProducts.length,
+    totalProducts: filteredProducts.length,
     stores: storeList,
     exchangeRates: EXCHANGE_RATES,
-    products: mergedProducts,
-    rawProducts: allProducts
+    products: filteredProducts
   };
 
   fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), 'utf-8');
@@ -3422,6 +3632,8 @@ module.exports = {
   loadCustomStores,
   getProgress,
   resetProgress,
+  inferCategory,
+  normalizeCategoryName,
   DATA_FILE,
   BUILT_IN_STORES,
   EXCHANGE_RATES
