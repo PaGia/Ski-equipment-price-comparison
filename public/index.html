@@ -1620,7 +1620,7 @@
 
       // 添加其他未在預設順序中的分類
       allCategories.forEach(cat => {
-        if (!categoryOrder.includes(cat)) {
+        if (!categoryOrder.includes(cat) && cat !== 'uncategorized') {
           const option = document.createElement('option');
           option.value = cat;
           option.textContent = categoryDisplayNames[cat] || cat;
